@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v11</title>
+    <title>Narrative Systems Engine v12</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -9,7 +9,9 @@
         #cy { flex-grow: 1; background: #0f0f0f; }
         
         #registry-panel { width: 380px; background: #151515; border-left: 1px solid #333; padding: 20px; overflow-y: auto; }
-        .registry-item { background: #222; padding: 12px; border-radius: 6px; margin-bottom: 12px; border-left: 4px solid #00d4ff; }
+        .registry-section { margin-bottom: 20px; }
+        .registry-header { color: #00d4ff; border-bottom: 1px solid #333; cursor: pointer; display: flex; justify-content: space-between; padding: 5px 0; }
+        .registry-item { background: #222; padding: 12px; border-radius: 6px; margin-top: 10px; border-left: 4px solid #00d4ff; }
         
         #inspector-popup { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -19,12 +21,9 @@
         .pop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
         
         .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 12px; border-radius: 8px; border: 1px solid #333; }
-        .search-box { background: #222; border: 1px solid #00d4ff; color: #fff; padding: 8px; border-radius: 4px; width: 200px; margin-top: 10px; }
-        
-        input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; font-family: inherit; }
+        input, textarea { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; font-family: inherit; }
         label { font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 12px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
-        .multi-tag { display: inline-block; background: #005f73; padding: 2px 8px; border-radius: 10px; font-size: 10px; margin: 2px; }
     </style>
 </head>
 <body>
@@ -34,35 +33,34 @@
 <div id="main-wrapper">
     <div class="controls">
         <button onclick="addNode()">+ New Scene</button>
-        <button onclick="exportAll()">Export Deep JSON</button>
+        <button onclick="exportAll()">Export JSON</button>
         <button onclick="document.getElementById('importFile').click()">Import JSON</button>
         <input type="file" id="importFile" style="display:none" onchange="importAll(event)">
         <br>
-        <input type="text" class="search-box" placeholder="Search Character/Setting..." oninput="globalSearch(this.value)">
+        <input type="text" style="width:200px; margin-top:10px;" placeholder="Search..." oninput="globalSearch(this.value)">
     </div>
-    
     <div id="cy"></div>
 
     <div id="inspector-popup">
         <h3 style="margin: 0 0 15px 0; color: #00d4ff;">SCENE FOCUS</h3>
         <div class="pop-grid">
             <div>
-                <label>Scene Label</label><input id="p-label" oninput="updateActiveNode()">
-                <label>Score (-10 to 10)</label><input type="number" id="p-score" oninput="updateActiveNode()">
+                <label>Scene Label</label><input id="p-label" oninput="updateActiveNode(false)">
+                <label>Score (-10 to 10)</label><input type="number" id="p-score" oninput="updateActiveNode(false)">
                 <div style="border: 1px solid #005f73; padding: 12px; margin-top: 15px; border-radius: 8px;">
                     <label>Characters (Comma separated)</label>
-                    <input id="p-char" placeholder="Alpha, Beta" oninput="updateActiveNode()">
+                    <input id="p-char" placeholder="Alpha, Beta" onchange="updateActiveNode(true)">
                     <label>Settings (Comma separated)</label>
-                    <input id="p-set" placeholder="Forest, Castle" oninput="updateActiveNode()">
+                    <input id="p-set" placeholder="Forest, Castle" onchange="updateActiveNode(true)">
                 </div>
             </div>
             <div>
-                <label>Action</label><input id="p-action" oninput="updateActiveNode()">
-                <label>Obstacle</label><input id="p-obstacle" oninput="updateActiveNode()">
-                <label>Utility</label><textarea id="p-utility" rows="4" oninput="updateActiveNode()"></textarea>
+                <label>Action</label><input id="p-action" oninput="updateActiveNode(false)">
+                <label>Obstacle</label><input id="p-obstacle" oninput="updateActiveNode(false)">
+                <label>Utility</label><textarea id="p-utility" rows="4" oninput="updateActiveNode(false)"></textarea>
             </div>
         </div>
-        <button style="margin-top: 25px; width: 100%; padding: 12px; background: #005f73; border:none; color:white; font-weight:bold;" onclick="closeInspector()">Save and Return to Map</button>
+        <button style="margin-top: 25px; width: 100%; padding: 12px; background: #005f73; border:none; color:white; font-weight:bold;" onclick="closeInspector()">Save & Return</button>
     </div>
 </div>
 
@@ -80,14 +78,13 @@
         container: document.getElementById('cy'),
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 75, 'height': 75, 'font-size': '10px', 'text-wrap': 'wrap', 'text-max-width': '60px' }},
-            { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#00d4ff' }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }}
         ]
     });
 
     function addNode() {
         const id = 'n' + Date.now();
-        cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444', characters: [], settings: [], action: '', obstacle: '', utility: '' }, position: { x: 100, y: window.innerHeight/2 } });
+        cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444', characters: [], settings: [] }, position: { x: 100, y: window.innerHeight/2 } });
     }
 
     cy.on('tap', 'node', function(evt){
@@ -117,17 +114,17 @@
         document.getElementById('p-utility').value = d.utility || '';
     }
 
-    function updateActiveNode() {
+    function updateActiveNode(updateRegistry) {
         if (!activeNode) return;
-        const charInput = document.getElementById('p-char').value.split(',').map(s => s.trim()).filter(s => s);
-        const setInput = document.getElementById('p-set').value.split(',').map(s => s.trim()).filter(s => s);
+        const chars = document.getElementById('p-char').value.split(',').map(s => s.trim()).filter(s => s);
+        const sets = document.getElementById('p-set').value.split(',').map(s => s.trim()).filter(s => s);
         const score = document.getElementById('p-score').value;
 
         activeNode.data({
             label: document.getElementById('p-label').value,
             score: score,
-            characters: charInput,
-            settings: setInput,
+            characters: chars,
+            settings: sets,
             action: document.getElementById('p-action').value,
             obstacle: document.getElementById('p-obstacle').value,
             utility: document.getElementById('p-utility').value,
@@ -135,9 +132,24 @@
         });
         
         activeNode.position('y', (window.innerHeight/2) - (score * 50));
-        charInput.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { desc: '', link: '' }; });
-        setInput.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { desc: '', link: '' }; });
-        updateRegistryPanel();
+        
+        if (updateRegistry) {
+            chars.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { desc: '', link: '' }; });
+            sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { desc: '', link: '' }; });
+            pruneRegistry();
+            updateRegistryPanel();
+        }
+    }
+
+    function pruneRegistry() {
+        const activeChars = new Set();
+        const activeSets = new Set();
+        cy.nodes().forEach(n => {
+            (n.data('characters') || []).forEach(c => activeChars.add(c));
+            (n.data('settings') || []).forEach(s => activeSets.add(s));
+        });
+        Object.keys(registry.characters).forEach(k => { if(!activeChars.has(k)) delete registry.characters[k]; });
+        Object.keys(registry.settings).forEach(k => { if(!activeSets.has(k)) delete registry.settings[k]; });
     }
 
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
@@ -145,32 +157,34 @@
     function updateRegistryPanel() {
         let html = '';
         ['characters', 'settings'].forEach(type => {
-            html += `<h4 style="text-transform:capitalize; color:#00d4ff; border-bottom:1px solid #333;">${type}</h4>`;
+            html += `<div class="registry-section">
+                <div class="registry-header" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+                    <span>${type.toUpperCase()}</span><span>▼</span>
+                </div>
+                <div>`;
             for (let name in registry[type]) {
                 html += `<div class="registry-item">
                     <strong>${name}</strong>
-                    <textarea placeholder="Deep Description..." oninput="registry.${type}['${name}'].desc=this.value">${registry[type][name].desc}</textarea>
-                    <input placeholder="Research Link" value="${registry[type][name].link}" oninput="registry.${type}['${name}'].link=this.value">
+                    <textarea placeholder="Description..." onchange="registry.${type}['${name}'].desc=this.value">${registry[type][name].desc}</textarea>
+                    <input placeholder="Link" value="${registry[type][name].link}" onchange="registry.${type}['${name}'].link=this.value">
                 </div>`;
             }
+            html += `</div></div>`;
         });
         document.getElementById('registry-content').innerHTML = html;
     }
 
     function globalSearch(term) {
-        if (!term) { cy.elements().style('opacity', 1); return; }
-        cy.elements().style('opacity', 0.1);
-        const matches = cy.nodes().filter(n => {
+        cy.elements().style('opacity', term ? 0.1 : 1);
+        if(!term) return;
+        cy.nodes().filter(n => {
             const d = n.data();
-            return (d.characters || []).some(c => c.toLowerCase().includes(term.toLowerCase())) ||
-                   (d.settings || []).some(s => s.toLowerCase().includes(term.toLowerCase())) ||
-                   d.label.toLowerCase().includes(term.toLowerCase());
-        });
-        matches.style('opacity', 1);
-        matches.connectedEdges().style('opacity', 0.8);
+            return d.label.toLowerCase().includes(term.toLowerCase()) || (d.characters || []).some(c => c.toLowerCase().includes(term.toLowerCase()));
+        }).style('opacity', 1).connectedEdges().style('opacity', 0.8);
     }
 
     function closeInspector() { 
+        updateActiveNode(true);
         document.querySelector('.overlay').style.display = 'none'; 
         document.getElementById('inspector-popup').style.display = 'none'; 
         activeNode = null; 
@@ -180,7 +194,7 @@
         const bundle = { graph: cy.elements().jsons(), registry: registry };
         const a = document.createElement("a");
         a.href = URL.createObjectURL(new Blob([JSON.stringify(bundle)], { type: "application/json" }));
-        a.download = "polymath-narrative-v11.json";
+        a.download = "polymath-narrative-v12.json";
         a.click();
     }
 
