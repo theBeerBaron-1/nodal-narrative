@@ -1,25 +1,28 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine</title>
+    <title>Narrative Systems Engine v2</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 0; overflow: hidden; }
-        #cy { width: 100vw; height: 100vh; display: block; background: #f9f9f9; }
-        .controls { position: absolute; top: 10px; left: 10px; z-index: 999; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        button { cursor: pointer; padding: 8px; margin-right: 5px; }
+        body { font-family: sans-serif; margin: 0; overflow: hidden; background: #1a1a1a; }
+        #cy { width: 100vw; height: 100vh; display: block; }
+        .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        button { cursor: pointer; padding: 10px 15px; margin-right: 5px; border: 1px solid #ddd; border-radius: 4px; background: #f0f0f0; font-weight: bold; }
+        button:hover { background: #e0e0e0; }
+        .hint { margin-top: 10px; font-size: 0.8em; color: #666; }
     </style>
 </head>
 <body>
 
 <div class="controls">
-    <button onclick="addNode()">Add Plot Point</button>
-    <button onclick="addEdge()">Connect Points</button>
+    <button onclick="addNode()">+ Add Plot Point</button>
+    <div class="hint">Click a node to select. Click a second to connect.</div>
 </div>
 <div id="cy"></div>
 
 <script>
-    // Initialize Cytoscape
+    let sourceNode = null;
+
     var cy = cytoscape({
         container: document.getElementById('cy'),
         style: [
@@ -28,75 +31,100 @@
                 style: {
                     'label': 'data(label)',
                     'background-color': 'data(color)',
-                    'color': '#333',
+                    'color': '#fff',
                     'text-valign': 'center',
-                    'text-halign': 'right',
-                    'width': 40,
-                    'height': 40
+                    'text-halign': 'center',
+                    'width': 60,
+                    'height': 60,
+                    'font-size': '10px',
+                    'text-wrap': 'wrap',
+                    'text-max-width': '50px'
+                }
+            },
+            {
+                selector: 'node:selected',
+                style: {
+                    'border-width': 4,
+                    'border-color': '#00d4ff'
                 }
             },
             {
                 selector: 'edge',
                 style: {
-                    'width': 3,
-                    'line-color': '#ccc',
-                    'target-arrow-color': '#ccc',
+                    'width': 4,
+                    'line-color': '#555',
+                    'target-arrow-color': '#555',
                     'target-arrow-shape': 'triangle',
                     'curve-style': 'bezier',
-                    'label': 'data(action)'
+                    'label': 'data(action)',
+                    'color': '#ccc',
+                    'font-size': '10px',
+                    'edge-text-rotation': 'autorotate'
                 }
             }
-        ],
-        layout: { name: 'grid' }
+        ]
     });
 
-    // Helper to turn -10/10 score into a Colour
     function getScoreColor(score) {
         let val = parseInt(score);
         if (val > 0) {
-            let intensity = Math.round((val / 10) * 255);
-            return `rgb(${255 - intensity}, 255, ${255 - intensity})`; // Shifts to Green
+            let intensity = 100 + Math.round((val / 10) * 155);
+            return `rgb(0, ${intensity}, 100)`; 
         } else if (val < 0) {
-            let intensity = Math.round((Math.abs(val) / 10) * 255);
-            return `rgb(255, ${255 - intensity}, ${255 - intensity})`; // Shifts to Red
+            let intensity = 100 + Math.round((Math.abs(val) / 10) * 155);
+            return `rgb(${intensity}, 0, 50)`; 
         }
-        return '#ccc'; // Neutral Grey
+        return '#555'; 
     }
 
     function addNode() {
-        let label = prompt("Enter Plot Point Label:", "New Scene");
-        let score = prompt("Enter Emotional Score (-10 to 10):", "0");
+        let label = prompt("Scene Label (Action/Event):", "New Scene");
+        let score = prompt("Emotional Score (-10 to 10):", "0");
         
         if (label && score !== null) {
             cy.add({
                 group: 'nodes',
                 data: { 
                     id: 'n' + Date.now(), 
-                    label: label + " (" + score + ")",
+                    label: label + "\n[" + score + "]",
                     color: getScoreColor(score)
                 },
-                position: { x: 100, y: 100 }
+                position: { x: window.innerWidth/2, y: window.innerHeight/2 }
             });
         }
     }
 
-    function addEdge() {
-        let source = prompt("Enter ID of START node (e.g., the first one created):");
-        let target = prompt("Enter ID of END node:");
-        let action = prompt("What is the Action/Desire?");
-
-        if (source && target) {
-            cy.add({
-                group: 'edges',
-                data: { 
-                    id: 'e' + Date.now(), 
-                    source: source, 
-                    target: target,
-                    action: action
-                }
-            });
+    // Interaction Logic for Connecting
+    cy.on('tap', 'node', function(evt){
+        let node = evt.target;
+        
+        if (!sourceNode) {
+            sourceNode = node;
+            node.select();
+        } else {
+            if (sourceNode.id() !== node.id()) {
+                let action = prompt("What is the Action or Desire that connects these?");
+                cy.add({
+                    group: 'edges',
+                    data: { 
+                        id: 'e' + Date.now(), 
+                        source: sourceNode.id(), 
+                        target: node.id(),
+                        action: action || ""
+                    }
+                });
+            }
+            sourceNode.unselect();
+            sourceNode = null;
         }
-    }
+    });
+
+    cy.on('tap', function(evt){
+        if(evt.target === cy){
+            if(sourceNode) sourceNode.unselect();
+            sourceNode = null;
+        }
+    });
 </script>
 </body>
 </html>
