@@ -1,22 +1,28 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v2</title>
+    <title>Narrative Systems Engine v3</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 0; overflow: hidden; background: #1a1a1a; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; overflow: hidden; background: #121212; color: #e0e0e0; }
         #cy { width: 100vw; height: 100vh; display: block; }
-        .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-        button { cursor: pointer; padding: 10px 15px; margin-right: 5px; border: 1px solid #ddd; border-radius: 4px; background: #f0f0f0; font-weight: bold; }
-        button:hover { background: #e0e0e0; }
-        .hint { margin-top: 10px; font-size: 0.8em; color: #666; }
+        .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #333; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        button { cursor: pointer; padding: 8px 12px; margin: 5px 2px; border: 1px solid #444; border-radius: 4px; background: #2d2d2d; color: #fff; font-size: 12px; transition: 0.2s; }
+        button:hover { background: #404040; border-color: #00d4ff; }
+        .hint { margin-top: 10px; font-size: 0.75em; color: #888; line-height: 1.4; }
+        .export-btn { background: #005f73; border: none; }
     </style>
 </head>
 <body>
 
 <div class="controls">
-    <button onclick="addNode()">+ Add Plot Point</button>
-    <div class="hint">Click a node to select. Click a second to connect.</div>
+    <button onclick="addNode()">+ New Scene</button>
+    <button class="export-btn" onclick="exportData()">Export JSON</button>
+    <div class="hint">
+        • <b>Connect:</b> Click source then target.<br>
+        • <b>Edit/Delete:</b> Click a node then use prompts.<br>
+        • <b>Split Action:</b> Click an edge (the line) to insert a node.
+    </div>
 </div>
 <div id="cy"></div>
 
@@ -34,30 +40,27 @@
                     'color': '#fff',
                     'text-valign': 'center',
                     'text-halign': 'center',
-                    'width': 60,
-                    'height': 60,
-                    'font-size': '10px',
+                    'width': 70,
+                    'height': 70,
+                    'font-size': '11px',
                     'text-wrap': 'wrap',
-                    'text-max-width': '50px'
+                    'text-max-width': '60px'
                 }
             },
             {
                 selector: 'node:selected',
-                style: {
-                    'border-width': 4,
-                    'border-color': '#00d4ff'
-                }
+                style: { 'border-width': 4, 'border-color': '#00d4ff' }
             },
             {
                 selector: 'edge',
                 style: {
-                    'width': 4,
-                    'line-color': '#555',
-                    'target-arrow-color': '#555',
+                    'width': 3,
+                    'line-color': '#444',
+                    'target-arrow-color': '#444',
                     'target-arrow-shape': 'triangle',
                     'curve-style': 'bezier',
                     'label': 'data(action)',
-                    'color': '#ccc',
+                    'color': '#aaa',
                     'font-size': '10px',
                     'edge-text-rotation': 'autorotate'
                 }
@@ -67,64 +70,93 @@
 
     function getScoreColor(score) {
         let val = parseInt(score);
-        if (val > 0) {
-            let intensity = 100 + Math.round((val / 10) * 155);
-            return `rgb(0, ${intensity}, 100)`; 
-        } else if (val < 0) {
-            let intensity = 100 + Math.round((Math.abs(val) / 10) * 155);
-            return `rgb(${intensity}, 0, 50)`; 
-        }
+        if (val > 0) return `rgb(0, ${100 + (val * 15)}, 100)`; 
+        if (val < 0) return `rgb(${100 + (Math.abs(val) * 15)}, 0, 50)`; 
         return '#555'; 
     }
 
     function addNode() {
-        let label = prompt("Scene Label (Action/Event):", "New Scene");
+        let label = prompt("Scene Label:", "New Scene");
         let score = prompt("Emotional Score (-10 to 10):", "0");
-        
         if (label && score !== null) {
             cy.add({
                 group: 'nodes',
-                data: { 
-                    id: 'n' + Date.now(), 
-                    label: label + "\n[" + score + "]",
-                    color: getScoreColor(score)
-                },
+                data: { id: 'n' + Date.now(), label: label + "\n[" + score + "]", score: score, color: getScoreColor(score) },
                 position: { x: window.innerWidth/2, y: window.innerHeight/2 }
             });
         }
     }
 
-    // Interaction Logic for Connecting
+    // INTERACTION LOGIC
     cy.on('tap', 'node', function(evt){
         let node = evt.target;
-        
         if (!sourceNode) {
             sourceNode = node;
             node.select();
+            
+            // Edit/Delete Option on first click
+            setTimeout(() => {
+                if (confirm("Would you like to Edit or Delete this node? (Cancel for 'Neither, I am connecting it')")) {
+                    let choice = prompt("Type 'E' to Edit or 'D' to Delete:");
+                    if (choice?.toUpperCase() === 'E') {
+                        let newLabel = prompt("New Label:", node.data('label').split('\n')[0]);
+                        let newScore = prompt("New Score:", node.data('score'));
+                        node.data('label', newLabel + "\n[" + newScore + "]");
+                        node.data('score', newScore);
+                        node.data('color', getScoreColor(newScore));
+                    } else if (choice?.toUpperCase() === 'D') {
+                        cy.remove(node);
+                    }
+                    sourceNode = null;
+                    node.unselect();
+                }
+            }, 300);
+
         } else {
             if (sourceNode.id() !== node.id()) {
-                let action = prompt("What is the Action or Desire that connects these?");
-                cy.add({
-                    group: 'edges',
-                    data: { 
-                        id: 'e' + Date.now(), 
-                        source: sourceNode.id(), 
-                        target: node.id(),
-                        action: action || ""
-                    }
-                });
+                let action = prompt("Connection Action/Desire:");
+                cy.add({ group: 'edges', data: { id: 'e' + Date.now(), source: sourceNode.id(), target: node.id(), action: action || "" } });
             }
             sourceNode.unselect();
             sourceNode = null;
         }
     });
 
-    cy.on('tap', function(evt){
-        if(evt.target === cy){
-            if(sourceNode) sourceNode.unselect();
-            sourceNode = null;
+    // SPLIT EDGE LOGIC
+    cy.on('tap', 'edge', function(evt){
+        let edge = evt.target;
+        if (confirm("Split this action with a new intermediate Plot Point?")) {
+            let label = prompt("Intermediate Scene Label:", "The Complication");
+            let score = prompt("Emotional Score (-10 to 10):", "0");
+            let midId = 'n' + Date.now();
+            
+            // Add new node in the middle
+            cy.add({
+                group: 'nodes',
+                data: { id: midId, label: label + "\n[" + score + "]", score: score, color: getScoreColor(score) },
+                position: { 
+                    x: (edge.source().position('x') + edge.target().position('x')) / 2,
+                    y: (edge.source().position('y') + edge.target().position('y')) / 2
+                }
+            });
+
+            // Reconnect
+            cy.add({ group: 'edges', data: { id: 'e1' + Date.now(), source: edge.source().id(), target: midId, action: "leads to" } });
+            cy.add({ group: 'edges', data: { id: 'e2' + Date.now(), source: midId, target: edge.target().id(), action: edge.data('action') } });
+            
+            cy.remove(edge);
         }
     });
+
+    function exportData() {
+        const data = JSON.stringify(cy.json(), null, 2);
+        const blob = new Blob([data], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "story-system-export.json";
+        a.click();
+    }
 </script>
 </body>
 </html>
