@@ -1,64 +1,68 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v8</title>
+    <title>Narrative Systems Engine v9</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; flex-direction: column; height: 100vh; }
         #main-container { display: flex; flex-grow: 1; overflow: hidden; position: relative; }
         #cy { flex-grow: 1; background: #0f0f0f; }
         
-        /* Two Column Pop-up Inspector */
+        /* Two Column Pop-up */
         #inspector-popup { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 700px; background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px;
-            padding: 20px; display: none; z-index: 1001; box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            width: 750px; background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px;
+            padding: 25px; display: none; z-index: 1001; box-shadow: 0 0 40px rgba(0,0,0,0.9);
         }
-        .pop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .pop-col { display: flex; flex-direction: column; }
-        .boundary-section { border-bottom: 1px solid #333; margin-bottom: 10px; padding-bottom: 10px; }
+        .pop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+        .boundary-section { border: 1px solid #333; padding: 15px; border-radius: 8px; background: #141414; margin-bottom: 15px; }
         
         #table-container { height: 250px; background: #111; border-top: 2px solid #333; overflow: auto; display: none; }
         table { width: 100%; border-collapse: collapse; font-size: 11px; }
-        th { background: #222; position: sticky; top: 0; padding: 8px; text-align: left; border-bottom: 1px solid #444; }
-        td { padding: 4px; border-bottom: 1px solid #222; }
+        th { background: #222; position: sticky; top: 0; padding: 10px; text-align: left; color: #00d4ff; }
+        td { padding: 6px; border-bottom: 1px solid #222; }
         
-        input, select, textarea { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 6px; margin-top: 4px; box-sizing: border-box; }
-        label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        input, select, textarea { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box; border-radius: 4px; }
+        label { font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold; }
         
-        .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 10px; border-radius: 8px; border: 1px solid #333; }
-        button { cursor: pointer; padding: 6px 12px; margin: 2px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 11px; }
-        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; z-index: 1000; }
+        .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 12px; border-radius: 8px; border: 1px solid #333; }
+        button { cursor: pointer; padding: 8px 14px; margin: 2px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 12px; transition: 0.3s; }
+        button:hover { background: #444; border-color: #00d4ff; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; z-index: 1000; }
     </style>
 </head>
 <body>
 
 <div class="overlay" onclick="closeInspector()"></div>
+
 <div class="controls">
     <button onclick="addNode()">+ New Scene</button>
-    <button onclick="toggleTable()">Toggle Table View</button>
-    <button onclick="exportData()">Export</button>
+    <button onclick="toggleTable()">Toggle Table</button>
+    <button onclick="exportData()">Export JSON</button>
+    <button onclick="document.getElementById('importFile').click()">Import JSON</button>
+    <input type="file" id="importFile" style="display:none" onchange="importData(event)">
+    <div style="font-size: 10px; color: #666; margin-top: 10px;">Click Source → Click Target to Connect</div>
 </div>
 
 <div id="main-container">
     <div id="cy"></div>
     
     <div id="inspector-popup">
-        <h3 style="margin: 0 0 15px 0; color: #00d4ff;">Scene Focus</h3>
+        <h3 style="margin: 0 0 20px 0; color: #00d4ff; letter-spacing: 1px;">SCENE FOCUS</h3>
         <div class="pop-grid">
             <div class="pop-col">
                 <div class="boundary-section">
-                    <label>Label</label>
+                    <label>Scene Label</label>
                     <input id="p-label" oninput="updateActiveNode()">
                     <label>Emotional Score (-10 to 10)</label>
-                    <input type="number" id="p-score" oninput="updateActiveNode()">
+                    <input type="number" id="p-score" min="-10" max="10" oninput="updateActiveNode()">
                 </div>
                 <div class="boundary-section" style="border-color: #005f73;">
-                    <label style="color: #00d4ff;">Participant (Character)</label>
+                    <label style="color: #00d4ff;">Character</label>
                     <input list="p-chars" id="p-char" onchange="updateActiveNode()">
                     <datalist id="p-chars"></datalist>
                     
-                    <label style="color: #00d4ff; margin-top: 10px; display: block;">Locale (Setting)</label>
+                    <label style="color: #00d4ff; margin-top: 15px; display: block;">Setting</label>
                     <input list="p-sets" id="p-set" onchange="updateActiveNode()">
                     <datalist id="p-sets"></datalist>
                 </div>
@@ -70,13 +74,13 @@
                 <input id="p-emotions" oninput="updateActiveNode()">
                 <label>Immersion</label>
                 <textarea id="p-immersion" rows="2" oninput="updateActiveNode()"></textarea>
-                <label>Obstacle (Label)</label>
+                <label>Obstacle</label>
                 <input id="p-obstacle" oninput="updateActiveNode()">
                 <label>Utility</label>
                 <textarea id="p-utility" rows="2" oninput="updateActiveNode()"></textarea>
             </div>
         </div>
-        <div style="margin-top: 15px; display: flex; justify-content: space-between;">
+        <div style="margin-top: 20px; display: flex; justify-content: space-between;">
             <button onclick="closeInspector()">Save & Close</button>
             <button style="background: #600;" onclick="deleteNode()">Delete Scene</button>
         </div>
@@ -84,10 +88,10 @@
 </div>
 
 <div id="table-container">
-    <table>
+    <table id="narrative-table">
         <thead>
             <tr>
-                <th>Label</th><th>Score</th><th>Char</th><th>Set</th><th>Action</th><th>Emotions</th><th>Obstacle</th>
+                <th>Label</th><th>Score</th><th>Character</th><th>Setting</th><th>Action</th><th>Emotions</th><th>Obstacle</th>
             </tr>
         </thead>
         <tbody id="table-body"></tbody>
@@ -104,19 +108,20 @@
         style: [
             { selector: 'node', style: {
                 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff',
-                'text-valign': 'center', 'width': 70, 'height': 70, 'font-size': '11px', 'text-wrap': 'wrap', 'text-max-width': '60px'
+                'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '11px', 'text-wrap': 'wrap', 'text-max-width': '70px'
             }},
+            { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#00d4ff' }},
             { selector: 'edge', style: {
-                'width': 3, 'line-color': '#00d4ff', 'target-arrow-shape': 'triangle', 'target-arrow-color': '#00d4ff',
-                'label': 'data(action)', 'color': '#aaa', 'curve-style': 'bezier', 'font-size': '10px',
-                'text-background-opacity': 1, 'text-background-color': '#0f0f0f', 'text-background-padding': '2px'
+                'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'target-arrow-color': '#00d4ff',
+                'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px',
+                'text-background-opacity': 1, 'text-background-color': '#1a1a1a', 'text-background-padding': '4px'
             }}
         ]
     });
 
     function getScoreColor(score) {
         let val = parseInt(score);
-        return val > 0 ? `rgb(0, ${120+(val*13)}, 150)` : (val < 0 ? `rgb(${120+(Math.abs(val)*13)}, 30, 60)` : '#444');
+        return val > 0 ? `rgb(0, ${100+(val*15)}, 150)` : (val < 0 ? `rgb(${100+(Math.abs(val)*15)}, 30, 60)` : '#444');
     }
 
     function addNode() {
@@ -124,43 +129,77 @@
         cy.add({
             group: 'nodes',
             data: { id: id, label: "New Scene", score: 0, character:'', setting:'', mainAction:'', emotions:'', immersion:'', obstacle:'', utility:'', color: '#444' },
-            position: { x: (cy.nodes().length * 150) + 100, y: window.innerHeight/2 }
+            position: { x: (cy.nodes().length * 180) + 100, y: window.innerHeight/2 }
         });
         refreshTable();
     }
 
+    // Interaction Logic: Double click for inspector, Single click for connection
     cy.on('tap', 'node', function(evt){
-        activeNode = evt.target;
+        let clickedNode = evt.target;
+        
         if (!sourceNode) {
-            sourceNode = activeNode;
-            activeNode.select();
-            // Show pop-up on single click
-            openInspector(activeNode);
+            sourceNode = clickedNode;
+            sourceNode.select();
         } else {
-            if (sourceNode.id() !== activeNode.id()) {
-                let act = prompt("Connection Label:");
-                cy.add({ group: 'edges', data: { id: 'e'+Date.now(), source: sourceNode.id(), target: activeNode.id(), action: act || "" } });
+            if (sourceNode.id() === clickedNode.id()) {
+                // Clicking the same node opens the inspector
+                openInspector(clickedNode);
+                sourceNode.unselect();
+                sourceNode = null;
+            } else {
+                // Clicking a second node creates a connection
+                let act = prompt("Connection Label (Action/Desire):");
+                if (act !== null) {
+                    cy.add({ group: 'edges', data: { id: 'e'+Date.now(), source: sourceNode.id(), target: clickedNode.id(), action: act } });
+                }
+                sourceNode.unselect();
+                sourceNode = null;
             }
-            sourceNode.unselect(); sourceNode = null;
+        }
+    });
+
+    // Splitting Logic
+    cy.on('tap', 'edge', function(evt){
+        let edge = evt.target;
+        if (confirm("Insert a new scene into this action?")) {
+            const midId = 'n' + Date.now();
+            const act = edge.data('action');
+            
+            cy.add({
+                group: 'nodes',
+                data: { id: midId, label: "Complication", score: 0, color: '#444' },
+                position: { 
+                    x: (edge.source().position('x') + edge.target().position('x')) / 2,
+                    y: (edge.source().position('y') + edge.target().position('y')) / 2
+                }
+            });
+            
+            cy.add([
+                { group: 'edges', data: { source: edge.source().id(), target: midId, action: "leads to" } },
+                { group: 'edges', data: { source: midId, target: edge.target().id(), action: act } }
+            ]);
+            cy.remove(edge);
+            refreshTable();
         }
     });
 
     function openInspector(node) {
+        activeNode = node;
         document.querySelector('.overlay').style.display = 'block';
         document.getElementById('inspector-popup').style.display = 'block';
         
-        // Populate fields
-        document.getElementById('p-label').value = node.data('label');
-        document.getElementById('p-score').value = node.data('score');
-        document.getElementById('p-char').value = node.data('character');
-        document.getElementById('p-set').value = node.data('setting');
-        document.getElementById('p-action').value = node.data('mainAction');
-        document.getElementById('p-emotions').value = node.data('emotions');
-        document.getElementById('p-immersion').value = node.data('immersion');
-        document.getElementById('p-obstacle').value = node.data('obstacle');
-        document.getElementById('p-utility').value = node.data('utility');
+        const d = node.data();
+        document.getElementById('p-label').value = d.label;
+        document.getElementById('p-score').value = d.score;
+        document.getElementById('p-char').value = d.character;
+        document.getElementById('p-set').value = d.setting;
+        document.getElementById('p-action').value = d.mainAction;
+        document.getElementById('p-emotions').value = d.emotions;
+        document.getElementById('p-immersion').value = d.immersion;
+        document.getElementById('p-obstacle').value = d.obstacle;
+        document.getElementById('p-utility').value = d.utility;
 
-        // Update datalists for dropdowns
         updateDatalists();
     }
 
@@ -193,7 +232,7 @@
     function closeInspector() {
         document.querySelector('.overlay').style.display = 'none';
         document.getElementById('inspector-popup').style.display = 'none';
-        if(sourceNode) { sourceNode.unselect(); sourceNode = null; }
+        activeNode = null;
     }
 
     function refreshTable() {
@@ -204,11 +243,11 @@
             tr.innerHTML = `
                 <td><input value="${n.data('label')}" oninput="updateFromTable('${n.id()}', 'label', this.value)"></td>
                 <td><input type="number" value="${n.data('score')}" oninput="updateFromTable('${n.id()}', 'score', this.value)"></td>
-                <td><input value="${n.data('character')}" oninput="updateFromTable('${n.id()}', 'character', this.value)"></td>
-                <td><input value="${n.data('setting')}" oninput="updateFromTable('${n.id()}', 'setting', this.value)"></td>
-                <td><input value="${n.data('mainAction')}" oninput="updateFromTable('${n.id()}', 'mainAction', this.value)"></td>
-                <td><input value="${n.data('emotions')}" oninput="updateFromTable('${n.id()}', 'emotions', this.value)"></td>
-                <td><input value="${n.data('obstacle')}" oninput="updateFromTable('${n.id()}', 'obstacle', this.value)"></td>
+                <td>${n.data('character')}</td>
+                <td>${n.data('setting')}</td>
+                <td>${n.data('mainAction')}</td>
+                <td>${n.data('emotions')}</td>
+                <td>${n.data('obstacle')}</td>
             `;
             tbody.appendChild(tr);
         });
@@ -229,8 +268,27 @@
         refreshTable();
     }
 
-    function deleteNode() { if(confirm("Delete scene?")) { cy.remove(activeNode); closeInspector(); refreshTable(); } }
-    function exportData() { /* Standard Blob Export logic */ }
+    function deleteNode() { if(confirm("Delete this scene?")) { cy.remove(activeNode); closeInspector(); refreshTable(); } }
+
+    function exportData() {
+        const json = JSON.stringify(cy.elements().jsons());
+        const blob = new Blob([json], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "narrative-export.json";
+        a.click();
+    }
+
+    function importData(event) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            cy.remove(cy.elements());
+            cy.add(JSON.parse(e.target.result));
+            cy.layout({ name: 'preset' }).run();
+            refreshTable();
+        };
+        reader.readAsText(event.target.files[0]);
+    }
 </script>
 </body>
 </html>
