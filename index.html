@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Narrative Systems Engine</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 0; overflow: hidden; }
+        #cy { width: 100vw; height: 100vh; display: block; background: #f9f9f9; }
+        .controls { position: absolute; top: 10px; left: 10px; z-index: 999; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        button { cursor: pointer; padding: 8px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="controls">
+    <button onclick="addNode()">Add Plot Point</button>
+    <button onclick="addEdge()">Connect Points</button>
+</div>
+<div id="cy"></div>
+
+<script>
+    // Initialize Cytoscape
+    var cy = cytoscape({
+        container: document.getElementById('cy'),
+        style: [
+            {
+                selector: 'node',
+                style: {
+                    'label': 'data(label)',
+                    'background-color': 'data(color)',
+                    'color': '#333',
+                    'text-valign': 'center',
+                    'text-halign': 'right',
+                    'width': 40,
+                    'height': 40
+                }
+            },
+            {
+                selector: 'edge',
+                style: {
+                    'width': 3,
+                    'line-color': '#ccc',
+                    'target-arrow-color': '#ccc',
+                    'target-arrow-shape': 'triangle',
+                    'curve-style': 'bezier',
+                    'label': 'data(action)'
+                }
+            }
+        ],
+        layout: { name: 'grid' }
+    });
+
+    // Helper to turn -10/10 score into a Colour
+    function getScoreColor(score) {
+        let val = parseInt(score);
+        if (val > 0) {
+            let intensity = Math.round((val / 10) * 255);
+            return `rgb(${255 - intensity}, 255, ${255 - intensity})`; // Shifts to Green
+        } else if (val < 0) {
+            let intensity = Math.round((Math.abs(val) / 10) * 255);
+            return `rgb(255, ${255 - intensity}, ${255 - intensity})`; // Shifts to Red
+        }
+        return '#ccc'; // Neutral Grey
+    }
+
+    function addNode() {
+        let label = prompt("Enter Plot Point Label:", "New Scene");
+        let score = prompt("Enter Emotional Score (-10 to 10):", "0");
+        
+        if (label && score !== null) {
+            cy.add({
+                group: 'nodes',
+                data: { 
+                    id: 'n' + Date.now(), 
+                    label: label + " (" + score + ")",
+                    color: getScoreColor(score)
+                },
+                position: { x: 100, y: 100 }
+            });
+        }
+    }
+
+    function addEdge() {
+        let source = prompt("Enter ID of START node (e.g., the first one created):");
+        let target = prompt("Enter ID of END node:");
+        let action = prompt("What is the Action/Desire?");
+
+        if (source && target) {
+            cy.add({
+                group: 'edges',
+                data: { 
+                    id: 'e' + Date.now(), 
+                    source: source, 
+                    target: target,
+                    action: action
+                }
+            });
+        }
+    }
+</script>
+</body>
+</html>
