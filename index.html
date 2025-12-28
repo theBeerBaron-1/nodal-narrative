@@ -1,23 +1,31 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v5</title>
+    <title>Narrative Systems Engine v6</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; }
-        #cy { flex-grow: 1; height: 100vh; background: #0f0f0f; }
-        #inspector { width: 300px; background: #1a1a1a; border-left: 1px solid #333; padding: 20px; overflow-y: auto; display: none; }
-        .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 15px; border-radius: 8px; border: 1px solid #333; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; flex-direction: column; height: 100vh; }
+        #main-container { display: flex; flex-grow: 1; overflow: hidden; }
+        #cy { flex-grow: 1; background: #0f0f0f; }
+        #inspector { width: 320px; background: #1a1a1a; border-left: 1px solid #333; padding: 15px; overflow-y: auto; display: none; }
+        #table-container { height: 250px; background: #111; border-top: 2px solid #333; overflow: auto; display: none; }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { background: #222; position: sticky; top: 0; padding: 8px; text-align: left; border-bottom: 1px solid #444; }
+        td { padding: 5px; border-bottom: 1px solid #222; }
+        input { background: #222; border: 1px solid #444; color: #fff; width: 90%; padding: 4px; }
+        
+        .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 10px; border-radius: 8px; border: 1px solid #333; }
         button { cursor: pointer; padding: 6px 10px; margin: 2px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 11px; }
         button:hover { border-color: #00d4ff; }
-        input, textarea { width: 100%; background: #222; border: 1px solid #444; color: #fff; margin-bottom: 10px; padding: 5px; }
-        label { font-size: 0.8em; color: #888; }
+        .active-btn { background: #005f73; }
     </style>
 </head>
 <body>
 
 <div class="controls">
     <button onclick="addNode()">+ New Scene</button>
+    <button onclick="toggleTable()">Toggle Data Table</button>
     <button onclick="exportData()">Export</button>
     <button onclick="document.getElementById('importFile').click()">Import</button>
     <input type="file" id="importFile" style="display:none" onchange="importData(event)">
@@ -26,19 +34,24 @@
     <button onclick="toggleAxis('obstacle')">Y = Obstacle Difficulty</button>
 </div>
 
-<div id="cy"></div>
+<div id="main-container">
+    <div id="cy"></div>
+    <div id="inspector">
+        <h4 id="ins-title" style="margin-top:0">Scene Inspector</h4>
+        <div id="ins-fields"></div>
+        <button style="background: #600; width:100%; margin-top:20px;" onclick="deleteNode()">Delete Node</button>
+    </div>
+</div>
 
-<div id="inspector">
-    <h3 id="ins-title">Scene Details</h3>
-    <label>Label</label><input id="ins-label" oninput="updateNode()">
-    <label>Score (-10 to 10)</label><input type="number" id="ins-score" oninput="updateNode()">
-    <label>Obstacle Difficulty (1-10)</label><input type="number" id="ins-obs-val" oninput="updateNode()">
-    <hr>
-    <label>Setting</label><input id="ins-setting" oninput="updateNode()">
-    <label>Character</label><input id="ins-char" oninput="updateNode()">
-    <label>Obstacle Description</label><textarea id="ins-obs-desc" oninput="updateNode()"></textarea>
-    <label>Utility</label><textarea id="ins-util" oninput="updateNode()"></textarea>
-    <button style="background:#600" onclick="deleteNode()">Delete Node</button>
+<div id="table-container">
+    <table id="narrative-table">
+        <thead>
+            <tr>
+                <th>Label</th><th>Score</th><th>Obstacle</th><th>Setting</th><th>Character</th><th>Main Action</th><th>Utility</th>
+            </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+    </table>
 </div>
 
 <script>
@@ -54,7 +67,7 @@
                 'text-valign': 'center', 'width': 60, 'height': 60, 'font-size': '10px'
             }},
             { selector: 'edge', style: {
-                'width': 2, 'line-color': '#444', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#888', 'curve-style': 'bezier'
+                'width': 3, 'line-color': '#444', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#888', 'curve-style': 'bezier', 'font-size': '10px'
             }}
         ]
     });
@@ -65,74 +78,103 @@
     }
 
     function addNode() {
-        let label = prompt("Scene Label:", "New Scene");
-        let score = prompt("Score (-10 to 10):", "0");
-        if (label === null || score === null) return;
-        
-        let id = 'n' + Date.now();
+        const id = 'n' + Date.now();
         cy.add({
             group: 'nodes',
             data: { 
-                id: id, label: label, score: parseInt(score), obstacleVal: 0,
-                setting: '', character: '', obsDesc: '', util: '', color: getScoreColor(score) 
+                id: id, label: "New Scene", score: 0, obstacleVal: 0,
+                setting: '', character: '', mainAction: '', immersion: '', obstacleDesc: '', util: '', color: '#444' 
             },
-            position: { x: (cy.nodes().length * 100) + 50, y: (window.innerHeight/2) - (score * Y_SCALE) }
+            position: { x: (cy.nodes().length * 120) + 100, y: window.innerHeight/2 }
         });
+        refreshTable();
     }
 
     cy.on('tap', 'node', function(evt){
-        let node = evt.target;
-        activeNode = node;
-        showInspector(node);
-
-        if (!sourceNode) {
-            sourceNode = node;
-        } else {
-            if (sourceNode.id() !== node.id()) {
-                let action = prompt("Action/Desire:");
-                cy.add({ group: 'edges', data: { id: 'e'+Date.now(), source: sourceNode.id(), target: node.id(), action: action || "" } });
+        activeNode = evt.target;
+        showInspector(activeNode);
+        if (!sourceNode) { sourceNode = activeNode; activeNode.select(); } 
+        else {
+            if (sourceNode.id() !== activeNode.id()) {
+                let act = prompt("Connection Action:");
+                cy.add({ group: 'edges', data: { id: 'e'+Date.now(), source: sourceNode.id(), target: activeNode.id(), action: act || "" } });
             }
-            sourceNode = null;
+            sourceNode.unselect(); sourceNode = null;
         }
     });
 
-    function showInspector(node) {
-        document.getElementById('inspector').style.display = 'block';
-        document.getElementById('ins-label').value = node.data('label');
-        document.getElementById('ins-score').value = node.data('score');
-        document.getElementById('ins-obs-val').value = node.data('obstacleVal') || 0;
-        document.getElementById('ins-setting').value = node.data('setting') || '';
-        document.getElementById('ins-char').value = node.data('character') || '';
-        document.getElementById('ins-obs-desc').value = node.data('obsDesc') || '';
-        document.getElementById('ins-util').value = node.data('util') || '';
+    cy.on('tap', 'edge', function(evt){
+        if(confirm("Insert new node into this action?")) {
+            let edge = evt.target;
+            let midId = 'n' + Date.now();
+            let midNode = cy.add({
+                group: 'nodes',
+                data: { id: midId, label: "Inserted Scene", score: 0, obstacleVal: 0, color: '#444' },
+                position: { x: (edge.source().position('x') + edge.target().position('x'))/2, y: (edge.source().position('y') + edge.target().position('y'))/2 }
+            });
+            cy.add([{ group: 'edges', data: { source: edge.source().id(), target: midId, action: "leads to" } },
+                    { group: 'edges', data: { source: midId, target: edge.target().id(), action: edge.data('action') } }]);
+            cy.remove(edge);
+            refreshTable();
+        }
+    });
+
+    function toggleTable() { 
+        let t = document.getElementById('table-container');
+        t.style.display = (t.style.display === 'none' || t.style.display === '') ? 'block' : 'none';
+        if(t.style.display === 'block') refreshTable();
     }
 
-    function updateNode() {
-        if (!activeNode) return;
-        let s = document.getElementById('ins-score').value;
-        activeNode.data({
-            label: document.getElementById('ins-label').value,
-            score: s,
-            obstacleVal: document.getElementById('ins-obs-val').value,
-            setting: document.getElementById('ins-setting').value,
-            character: document.getElementById('ins-char').value,
-            obsDesc: document.getElementById('ins-obs-desc').value,
-            util: document.getElementById('ins-util').value,
-            color: getScoreColor(s)
+    function refreshTable() {
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = '';
+        cy.nodes().forEach(node => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input value="${node.data('label')}" onchange="updateFromTable('${node.id()}', 'label', this.value)"></td>
+                <td><input type="number" value="${node.data('score')}" onchange="updateFromTable('${node.id()}', 'score', this.value)"></td>
+                <td><input type="number" value="${node.data('obstacleVal')}" onchange="updateFromTable('${node.id()}', 'obstacleVal', this.value)"></td>
+                <td><input value="${node.data('setting')}" onchange="updateFromTable('${node.id()}', 'setting', this.value)"></td>
+                <td><input value="${node.data('character')}" onchange="updateFromTable('${node.id()}', 'character', this.value)"></td>
+                <td><input value="${node.data('mainAction')}" onchange="updateFromTable('${node.id()}', 'mainAction', this.value)"></td>
+                <td><input value="${node.data('util')}" onchange="updateFromTable('${node.id()}', 'util', this.value)"></td>
+            `;
+            tbody.appendChild(tr);
         });
-        activeNode.position('y', (window.innerHeight/2) - (s * Y_SCALE));
+    }
+
+    function updateFromTable(id, field, value) {
+        let n = cy.getElementById(id);
+        n.data(field, value);
+        if(field === 'score' || field === 'obstacleVal') {
+            n.data('color', getScoreColor(n.data('score')));
+            toggleAxis(window.currentAxis || 'score');
+        }
+        if(activeNode && activeNode.id() === id) showInspector(n);
+    }
+
+    function showInspector(node) {
+        document.getElementById('inspector').style.display = 'block';
+        const fields = ['label', 'score', 'obstacleVal', 'setting', 'character', 'mainAction', 'immersion', 'obstacleDesc', 'util'];
+        let html = '';
+        fields.forEach(f => {
+            html += `<label style="font-size:10px; color:#888;">${f.toUpperCase()}</label>
+                     <input value="${node.data(f) || ''}" oninput="updateFromTable('${node.id()}', '${f}', this.value)">`;
+        });
+        document.getElementById('ins-fields').innerHTML = html;
     }
 
     function toggleAxis(type) {
+        window.currentAxis = type;
         cy.nodes().forEach(n => {
             let val = type === 'score' ? n.data('score') : n.data('obstacleVal');
             n.animate({ position: { y: (window.innerHeight/2) - (val * Y_SCALE) } });
         });
     }
 
-    function deleteNode() { if(activeNode && confirm("Delete?")) { cy.remove(activeNode); document.getElementById('inspector').style.display = 'none'; } }
-    function exportData() { /* Same as previous turns */ }
-    function importData(event) { /* Same as previous turns */ }
+    function deleteNode() { if(activeNode && confirm("Delete?")) { cy.remove(activeNode); document.getElementById('inspector').style.display = 'none'; refreshTable(); } }
+    function exportData() { /* Standard JSON export */ }
+    function importData(event) { /* Standard JSON import */ }
 </script>
 </body>
 </html>
