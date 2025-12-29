@@ -1,35 +1,41 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v22</title>
+    <title>Narrative Systems Engine v23</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
         #main-wrapper { display: flex; flex-grow: 1; flex-direction: column; position: relative; }
         #cy { flex-grow: 1; background: #0f0f0f; }
-        #registry-panel { width: 420px; background: #151515; border-left: 1px solid #333; padding: 20px; overflow-y: auto; }
+        #registry-panel { width: 400px; background: #151515; border-left: 1px solid #333; padding: 20px; overflow-y: auto; }
         .registry-item { background: #222; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #00d4ff; }
-        .hybrid-box { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-        .hybrid-img { width: 100%; height: 120px; background: #333; border-radius: 4px; object-fit: cover; }
         
-        .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 2000; box-shadow: 0 0 60px #000; color: #fff; width: 400px; }
+        /* Custom Modals */
+        .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 2000; box-shadow: 0 0 60px #000; width: 450px; }
         #inspector-popup { width: 850px; }
-        
+        #wheel-modal { width: 350px; max-height: 80vh; overflow-y: auto; }
+
         .pop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 10px; border-radius: 8px; border: 1px solid #333; }
-        button { cursor: pointer; padding: 8px 12px; margin: 2px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 11px; }
-        input, textarea { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; }
+        button { cursor: pointer; padding: 6px 12px; margin: 2px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 11px; }
+        input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; }
         label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 10px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
+        .wheel-item { width:100%; text-align:left; background:#222; border:1px solid #444; color:#fff; padding:8px; margin:2px 0; border-radius:4px; cursor:pointer; }
     </style>
 </head>
 <body>
 
 <div class="overlay" onclick="closeAllModals()"></div>
 
+<div id="wheel-modal" class="custom-modal">
+    <h3 id="wheel-title" style="color:#00d4ff; margin:0 0 15px 0;">Lexical Family</h3>
+    <div id="wheel-content"></div>
+</div>
+
 <div id="prompt-modal" class="custom-modal">
-    <h3 id="modal-title" style="color:#00d4ff; margin-top:0;">Input</h3>
-    <input id="modal-input" placeholder="Type here...">
+    <h3 id="modal-title" style="color:#00d4ff; margin:0;">Input</h3>
+    <input id="modal-input">
     <div style="margin-top:20px; display:flex; justify-content: space-between;">
         <button id="modal-confirm" style="background:#005f73; width:48%;">Confirm</button>
         <button onclick="closeAllModals()" style="width:48%;">Cancel</button>
@@ -51,30 +57,39 @@
             <div>
                 <label>Scene Label</label><input id="p-label">
                 <label>Score (-10 to 10)</label><input type="number" id="p-score">
-                <label>Characters (Comma Sep)</label><input id="p-char">
-                <label>Setting (Comma Sep)</label><input id="p-set">
+                <label>Characters</label><input id="p-char">
+                <label>Setting</label><input id="p-set">
             </div>
             <div>
-                <label>Action</label><input id="p-action">
-                <label>Obstacle</label><input id="p-obstacle">
-                <label>Utility</label><input id="p-utility">
+                <label>Action <button onclick="openWheel('action')">🔍 Wheel</button></label><input id="p-action">
+                <label>Emotions <button onclick="openWheel('emotions')">🔍 Wheel</button></label><input id="p-emotions">
+                <label>Immersion <button onclick="openWheel('immersion')">🔍 Wheel</button></label><input id="p-immersion">
+                <label>Utility <button onclick="openWheel('utility')">🔍 Wheel</button></label><input id="p-utility">
             </div>
         </div>
-        <button style="margin-top: 25px; width: 100%; padding: 12px; background: #005f73; border:none; color:white;" onclick="saveAndClose()">Save & Exit</button>
+        <button style="margin-top:25px; width:100%; padding:12px; background:#005f73; border:none; color:white;" onclick="saveAndClose()">Save & Exit</button>
     </div>
 </div>
 
-<div id="registry-panel"><h3 style="color: #00d4ff; margin-top: 0;">World Registry</h3><div id="registry-content"></div></div>
+<div id="registry-panel"><h3 style="color:#00d4ff; margin-top:0;">World Registry</h3><div id="registry-content"></div></div>
 
 <script>
     let activeNode = null, sourceNode = null, registry = { characters: {}, settings: {} };
     const Y_SCALE = 60;
+
+    const banks = {
+        utility: ["Inciting Incident", "Characterisation Shift", "Problem Escalation", "Rising Tension", "Midpoint Pivot", "Resolution", "World Building"],
+        action: ["Confronts", "Betrays", "Escapes", "Discovers", "Negotiates", "Infiltrates", "Sacrifices"],
+        emotions: ["Melancholy", "Euphoria", "Resentment", "Dread", "Anticipation", "Hope", "Terror"],
+        immersion: ["Sulphurous", "Bleached", "Rot-sweet", "Airless", "Luminous", "Neon-soaked", "Iron-tanged"]
+    };
 
     var cy = cytoscape({
         container: document.getElementById('cy'),
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px' }},
             { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#00d4ff' }},
+            { selector: 'node[type="friction"]', style: { 'width': 30, 'height': 30, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top' }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }}
         ]
     });
@@ -84,10 +99,8 @@
         const modal = document.getElementById('prompt-modal');
         modal.style.display = 'block';
         document.getElementById('modal-title').innerText = title;
-        const input = document.getElementById('modal-input');
-        input.value = '';
         document.getElementById('modal-confirm').onclick = () => {
-            callback(input.value);
+            callback(document.getElementById('modal-input').value);
             closeAllModals();
         };
     }
@@ -103,7 +116,7 @@
         else {
             if (sourceNode.id() === n.id()) { openInspector(n); } 
             else {
-                const s = sourceNode; // Hold reference
+                const s = sourceNode;
                 showCustomPrompt("Connection Label", (val) => {
                     if (val) cy.add({ group: 'edges', data: { source: s.id(), target: n.id(), action: val } });
                 });
@@ -112,32 +125,63 @@
         }
     });
 
-    function openInspector(n) {
-        activeNode = n; const d = n.data();
+    cy.on('tap', 'edge', function(evt){
+        const edge = evt.target;
+        showCustomPrompt("Type 'N' for Node or 'F' for Friction", (val) => {
+            const midX = (edge.source().position('x') + edge.target().position('x')) / 2;
+            const midY = (edge.source().position('y') + edge.target().position('y')) / 2;
+            if (val?.toUpperCase() === 'N') {
+                const midId = 'n' + Date.now();
+                cy.add({ group: 'nodes', data: { id: midId, label: "Complication", score: 0, color: '#444' }, position: { x: midX, y: midY } });
+                cy.add([{ group: 'edges', data: { source: edge.source().id(), target: midId, action: "leads to" } }, { group: 'edges', data: { source: midId, target: edge.target().id(), action: edge.data('action') } }]);
+                cy.remove(edge);
+            } else if (val?.toUpperCase() === 'F') {
+                showCustomPrompt("Friction Label", (fLab) => {
+                    cy.add({ group: 'nodes', data: { id: 'f'+Date.now(), type: "friction", label: fLab || "PIN" }, position: { x: midX, y: midY } });
+                });
+            }
+        });
+    });
+
+    function openWheel(key) {
+        document.getElementById('wheel-modal').style.display = 'block';
         document.querySelector('.overlay').style.display = 'block';
+        document.getElementById('wheel-content').innerHTML = banks[key].map(w => `<button class="wheel-item" onclick="selectWord('${key}','${w}')">${w}</button>`).join('');
+    }
+
+    function selectWord(key, word) {
+        document.getElementById('p-' + key).value = word;
+        closeAllModals();
+    }
+
+    function openInspector(n) {
+        activeNode = n;
         document.getElementById('inspector-popup').style.display = 'block';
-        ['label', 'score', 'char', 'set', 'action', 'obstacle', 'utility'].forEach(f => {
+        document.querySelector('.overlay').style.display = 'block';
+        ['label', 'score', 'char', 'set', 'action', 'emotions', 'immersion', 'utility'].forEach(f => {
             let el = document.getElementById('p-' + f);
-            if (f === 'char' || f === 'set') el.value = (d[f + 'acters'] || d[f + 'tings'] || []).join(', ');
-            else el.value = d[f] || '';
+            if (f === 'char' || f === 'set') el.value = (n.data(f + 'acters') || n.data(f + 'tings') || []).join(', ');
+            else el.value = n.data(f) || '';
         });
     }
 
     function saveAndClose() {
         if (!activeNode) return;
-        const d = {
-            label: document.getElementById('p-label').value, score: document.getElementById('p-score').value,
-            characters: document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s),
-            settings: document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s),
+        const score = document.getElementById('p-score').value;
+        const chars = document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s);
+        const sets = document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s);
+        activeNode.data({
+            label: document.getElementById('p-label').value, score: score,
+            characters: chars, settings: sets,
             action: document.getElementById('p-action').value,
-            obstacle: document.getElementById('p-obstacle').value,
+            emotions: document.getElementById('p-emotions').value,
+            immersion: document.getElementById('p-immersion').value,
             utility: document.getElementById('p-utility').value,
-            color: nPos(document.getElementById('p-score').value)
-        };
-        activeNode.data(d);
-        activeNode.position('y', (window.innerHeight/2) - (d.score * Y_SCALE));
-        d.characters.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { ex1: '', ex2: '' }; });
-        d.settings.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { ex1: '', ex2: '' }; });
+            color: nPos(score)
+        });
+        activeNode.position('y', (window.innerHeight/2) - (score * Y_SCALE));
+        chars.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { hybrid1: '', hybrid2: '', desc: '' }; });
+        sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { hybrid1: '', hybrid2: '', desc: '' }; });
         refreshRegistry();
         closeAllModals();
     }
@@ -150,14 +194,11 @@
                 const item = registry[type][name];
                 html += `<div class="registry-item">
                     <strong>${name}</strong>
-                    <div class="hybrid-box">
-                        <input placeholder="Example 1" value="${item.ex1}" onchange="registry.${type}['${name}'].ex1=this.value; refreshRegistry()">
-                        <input placeholder="Example 2" value="${item.ex2}" onchange="registry.${type}['${name}'].ex2=this.value; refreshRegistry()">
+                    <div style="display:flex; gap:5px; margin:5px 0;">
+                        <input placeholder="Hybrid A" value="${item.hybrid1}" onchange="registry.${type}['${name}'].hybrid1=this.value; refreshRegistry()">
+                        <input placeholder="Hybrid B" value="${item.hybrid2}" onchange="registry.${type}['${name}'].hybrid2=this.value; refreshRegistry()">
                     </div>
-                    <div class="hybrid-box">
-                        <img class="hybrid-img" src="https://source.unsplash.com/featured/?${item.ex1}" onerror="this.src='https://via.placeholder.com/150?text=Wait'">
-                        <img class="hybrid-img" src="https://source.unsplash.com/featured/?${item.ex2}" onerror="this.src='https://via.placeholder.com/150?text=Wait'">
-                    </div>
+                    <textarea placeholder="Friction/Descriptor..." onchange="registry.${type}['${name}'].desc=this.value">${item.desc}</textarea>
                 </div>`;
             }
         });
@@ -165,29 +206,9 @@
     }
 
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
-    function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; if(sourceNode) sourceNode.unselect(); sourceNode = null; }
-    
-    function exportDeep() {
-        const bundle = { graph: cy.elements().jsons(), registry: registry };
-        const blob = new Blob([JSON.stringify(bundle)], { type: "application/json" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "narrative-v22.json";
-        a.click();
-    }
-
-    function importDeep(event) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const bundle = JSON.parse(e.target.result);
-            cy.remove(cy.elements());
-            cy.add(bundle.graph);
-            registry = bundle.registry || { characters: {}, settings: {} };
-            refreshRegistry();
-            cy.layout({ name: 'preset' }).run();
-        };
-        reader.readAsText(event.target.files[0]);
-    }
+    function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; if(sourceNode) sourceNode.unselect(); sourceNode = null; }
+    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v23.json"; a.click(); }
+    function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
 </body>
 </html>
