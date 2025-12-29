@@ -1,14 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v30</title>
+    <title>Narrative Systems Engine v31</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
         #main-wrapper { display: flex; flex-grow: 1; flex-direction: column; position: relative; }
         #cy { flex-grow: 1; background: #0f0f0f; }
         #registry-panel { width: 420px; background: #151515; border-left: 1px solid #333; padding: 20px; overflow-y: auto; }
-        .registry-item { background: #222; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #00d4ff; }
+        .registry-item { background: #222; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #00d4ff; cursor: pointer; transition: 0.2s; }
+        .registry-item:hover { background: #2a2a2a; border-left-color: #fff; }
+        .registry-item.active-lens { border-left-width: 8px; background: #003a47; }
         
         .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 3000; box-shadow: 0 0 60px #000; width: 450px; }
         #inspector-popup { width: 850px; z-index: 2000; }
@@ -19,10 +21,7 @@
         input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; font-family: inherit; }
         label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 12px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
-        
         .lexical-row { display: flex; gap: 5px; align-items: center; }
-        .lexical-row select { width: 40%; }
-        .lexical-row input { width: 60%; }
     </style>
 </head>
 <body>
@@ -52,6 +51,7 @@
         <button onclick="exportDeep()">Export JSON</button>
         <button onclick="document.getElementById('importFile').click()">Import JSON</button>
         <input type="file" id="importFile" style="display:none" onchange="importDeep(event)">
+        <button onclick="clearHighlights()" style="border-color:#600">Clear Highlights</button>
     </div>
     <div id="cy"></div>
 
@@ -61,8 +61,8 @@
             <div>
                 <label>Scene Label</label><input id="p-label">
                 <label>Emotional Score (-10 to 10)</label><input type="number" id="p-score">
-                <label>Characters</label><input id="p-char">
-                <label>Setting</label><input id="p-set">
+                <label>Characters (Comma separated)</label><input id="p-char">
+                <label>Settings (Comma separated)</label><input id="p-set">
             </div>
             <div>
                 <label>Action Family</label>
@@ -71,21 +71,18 @@
                     <select id="p-action-word" onchange="document.getElementById('p-action-val').value=this.value"></select>
                 </div>
                 <input id="p-action-val">
-
                 <label>Emotions Family</label>
                 <div class="lexical-row">
                     <select id="p-emotions-cat" onchange="updateSubList('emotions', this.value)"></select>
                     <select id="p-emotions-word" onchange="document.getElementById('p-emotions-val').value=this.value"></select>
                 </div>
                 <input id="p-emotions-val">
-
-                <label>Immersion (Sensory)</label>
+                <label>Immersion</label>
                 <div class="lexical-row">
                     <select id="p-immersion-cat" onchange="updateSubList('immersion', this.value)"></select>
                     <select id="p-immersion-word" onchange="document.getElementById('p-immersion-val').value=this.value"></select>
                 </div>
                 <input id="p-immersion-val">
-
                 <label>Utility</label>
                 <div class="lexical-row">
                     <select id="p-utility-cat" onchange="updateSubList('utility', this.value)"></select>
@@ -102,21 +99,22 @@
 
 <script>
     let activeNode = null, sourceNode = null, activeEdge = null, registry = { characters: {}, settings: {} };
+    let currentLens = { type: null, name: null };
     const Y_SCALE = 60;
 
     const banks = {
-        action: { "Conflict": ["Confronts", "Attacks", "Sabotages", "Ambushes"], "Subterfuge": ["Betrays", "Deceives", "Infiltrates", "Eavesdrops"], "Social": ["Negotiates", "Confesses", "Persuades", "Instructs"] },
-        emotions: { "High Energy": ["Euphoria", "Terror", "Rage", "Awe"], "Low Energy": ["Melancholy", "Dread", "Despair", "Nostalgia"], "Internal": ["Shame", "Guilt", "Hope", "Determination"] },
-        utility: { "Structural": ["Inciting Incident", "Midpoint Pivot", "Resolution", "Rising Tension"], "Development": ["Character Intro", "Thematic Setup", "World Building", "Expositional Reveal"] },
-        immersion: { "Sensory": ["Sulphurous", "Rot-sweet", "Iron-tanged", "Dust-caked"], "Environmental": ["Neon-soaked", "Bleached", "Luminous", "Weatherworn", "Echoing"] }
+        action: { "Conflict": ["Confronts", "Attacks", "Sabotages"], "Subterfuge": ["Betrays", "Deceives", "Infiltrates"], "Social": ["Negotiates", "Confesses", "Persuades"] },
+        emotions: { "High": ["Euphoria", "Terror", "Rage"], "Low": ["Melancholy", "Dread", "Despair"], "Internal": ["Nostalgia", "Hope", "Shame"] },
+        utility: { "Structural": ["Inciting Incident", "Midpoint Pivot", "Resolution"], "Developmental": ["Character Intro", "Thematic Setup", "World Building"] },
+        immersion: { "Sensory": ["Sulphurous", "Rot-sweet", "Iron-tanged"], "Visual": ["Neon-soaked", "Bleached", "Luminous"] }
     };
 
     var cy = cytoscape({
         container: document.getElementById('cy'),
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'text-wrap': 'wrap' }},
-            { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#00d4ff' }},
-            { selector: 'node[type="friction"]', style: { 'width': 35, 'height': 35, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top', 'z-index': 999, 'font-size': '10px' }},
+            { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#fff' }},
+            { selector: 'node[type="friction"]', style: { 'width': 35, 'height': 35, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top', 'z-index': 999 }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }}
         ]
     });
@@ -127,8 +125,7 @@
             catSelect.innerHTML = '<option value="">Family...</option>';
             Object.keys(banks[key]).forEach(cat => {
                 let opt = document.createElement('option');
-                opt.value = cat; opt.innerText = cat;
-                catSelect.appendChild(opt);
+                opt.value = cat; opt.innerText = cat; catSelect.appendChild(opt);
             });
         });
     }
@@ -139,8 +136,7 @@
         if (!category) return;
         banks[key][category].forEach(word => {
             let opt = document.createElement('option');
-            opt.value = word; opt.innerText = word;
-            wordSelect.appendChild(opt);
+            opt.value = word; opt.innerText = word; wordSelect.appendChild(opt);
         });
     }
 
@@ -167,7 +163,7 @@
             if (sourceNode.id() === n.id()) { openInspector(n); } 
             else {
                 const s = sourceNode;
-                showCustomPrompt("Connection Action", "Desire or Action...", (val) => {
+                showCustomPrompt("Connection Label", "Action...", (val) => {
                     if (val) cy.add({ group: 'edges', data: { source: s.id(), target: n.id(), action: val } });
                 });
             }
@@ -183,10 +179,9 @@
 
     function handleConnectorChoice(choice) {
         const edge = activeEdge;
-        // Center of viewport for manual pin placement
-        const pan = cy.pan(); const zoom = cy.zoom();
-        const x = (window.innerWidth / 2 - pan.x) / zoom;
-        const y = (window.innerHeight / 2 - pan.y) / zoom;
+        const p = cy.pan(); const z = cy.zoom();
+        const x = (window.innerWidth/2 - p.x)/z;
+        const y = (window.innerHeight/2 - p.y)/z;
 
         if (choice === 'F') {
             showCustomPrompt("Friction Label", "e.g. Resistance", (fLab) => {
@@ -233,26 +228,60 @@
         chars.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { h1: '', h2: '', desc: '' }; });
         sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { h1: '', h2: '', desc: '' }; });
         refreshRegistry(); closeAllModals();
+        if (currentLens.name) applyLens(currentLens.type, currentLens.name);
     }
 
     function refreshRegistry() {
         let html = '';
         ['characters', 'settings'].forEach(type => {
-            html += `<h4 style="color:#00d4ff">${type.toUpperCase()}</h4>`;
+            html += `<h4 style="color:#00d4ff; margin-bottom:5px;">${type.toUpperCase()}</h4>`;
             for (let name in registry[type]) {
                 const item = registry[type][name];
-                html += `<div class="registry-item"><strong>${name}</strong>
-                    <div style="display:flex; gap:5px; margin:5px 0;"><input placeholder="Hybrid A" value="${item.h1||''}" onchange="registry.${type}['${name}'].h1=this.value; refreshRegistry()"><input placeholder="Hybrid B" value="${item.h2||''}" onchange="registry.${type}['${name}'].h2=this.value; refreshRegistry()"></div>
-                    <textarea placeholder="Descriptor..." onchange="registry.${type}['${name}'].desc=this.value">${item.desc||''}</textarea>
+                const isActive = (currentLens.type === type && currentLens.name === name) ? 'active-lens' : '';
+                html += `<div class="registry-item ${isActive}" onclick="applyLens('${type}', '${name}')">
+                    <strong>${name}</strong>
+                    <div style="display:flex; gap:5px; margin:5px 0;" onclick="event.stopPropagation()">
+                        <input placeholder="Hybrid A" value="${item.h1||''}" onchange="registry.${type}['${name}'].h1=this.value; refreshRegistry()">
+                        <input placeholder="Hybrid B" value="${item.h2||''}" onchange="registry.${type}['${name}'].h2=this.value; refreshRegistry()">
+                    </div>
+                    <textarea placeholder="Descriptor..." onclick="event.stopPropagation()" onchange="registry.${type}['${name}'].desc=this.value">${item.desc||''}</textarea>
                 </div>`;
             }
         });
         document.getElementById('registry-content').innerHTML = html;
     }
 
+    function applyLens(type, name) {
+        currentLens = { type: type, name: name };
+        const dataKey = type === 'characters' ? 'characters' : 'settings';
+        
+        cy.elements().style('opacity', 0.1);
+        cy.nodes('[type="friction"]').style('opacity', 0.8); // Pins stay visible for context
+
+        const matchingNodes = cy.nodes().filter(n => (n.data(dataKey) || []).includes(name));
+        matchingNodes.style('opacity', 1);
+
+        cy.edges().forEach(edge => {
+            const hasInSource = (edge.source().data(dataKey) || []).includes(name);
+            const hasInTarget = (edge.target().data(dataKey) || []).includes(name);
+            if (hasInSource && hasInTarget) {
+                edge.style({ 'opacity': 1, 'line-color': '#00d4ff', 'width': 6 });
+            } else {
+                edge.style({ 'line-color': '#333', 'width': 4 });
+            }
+        });
+        refreshRegistry();
+    }
+
+    function clearHighlights() {
+        currentLens = { type: null, name: null };
+        cy.elements().style({ 'opacity': 1, 'line-color': '#333', 'width': 4 });
+        refreshRegistry();
+    }
+
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
     function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; if(sourceNode) sourceNode.unselect(); sourceNode = null; }
-    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v30.json"; a.click(); }
+    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v31.json"; a.click(); }
     function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
 </body>
