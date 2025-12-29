@@ -195,29 +195,45 @@
         document.getElementById('connector-modal').style.display = 'block';
     });
 
-    function handleConnectorChoice(choice) {
-        const edge = activeEdge;
-        const sNode = edge.source();
-        const tNode = edge.target();
-        const originalAction = edge.data('action');
-        const midX = (sNode.position().x + tNode.position().x) / 2;
-        const midY = (sNode.position().y + tNode.position().y) / 2;
+function handleConnectorChoice(choice) {
+    const edge = activeEdge; 
+    if (!edge) return;
 
-        if (choice === 'F') {
-            showCustomPrompt("Friction Label", "Conflict...", (fLab) => {
-                const frictionId = 'f' + Date.now();
-                cy.remove(edge);
-                cy.add({ group: 'nodes', data: { id: frictionId, type: "friction", label: fLab || "PIN", characters: [], settings: [] }, position: { x: midX, y: midY } });
-                cy.add([{ group: 'edges', data: { source: sNode.id(), target: frictionId, action: "friction" } },{ group: 'edges', data: { source: frictionId, target: tNode.id(), action: originalAction } }]);
-            });
-        } else if (choice === 'N') {
-            const midId = 'n' + Date.now();
-            cy.remove(edge);
-            cy.add({ group: 'nodes', data: { id: midId, label: "Complication", score: 0, color: '#444', characters: [], settings: [] }, position: { x: midX, y: midY } });
-            cy.add([{ group: 'edges', data: { source: sNode.id(), target: midId, action: "leads to" } }, { group: 'edges', data: { source: midId, target: tNode.id(), action: originalAction } }]);
-        }
-        closeAllModals(); refreshRegistry();
+    const sNode = edge.source(); 
+    const tNode = edge.target(); 
+    const originalAction = edge.data('action');
+    const midX = (sNode.position().x + tNode.position().x) / 2;
+    const midY = (sNode.position().y + tNode.position().y) / 2;
+
+    const addIntermediateNode = (label, type="intermediate") => {
+        const midId = type[0] + Date.now();
+        cy.remove(edge);
+
+        const newNode = cy.add({
+            group: 'nodes',
+            data: { id: midId, label: label, type: type, score: 0, color: '#444', characters: [], settings: [] },
+            position: { x: midX, y: midY }
+        });
+
+        cy.add([
+            { group: 'edges', data: { source: sNode.id(), target: midId, action: type === "friction" ? "friction" : "leads to" } },
+            { group: 'edges', data: { source: midId, target: tNode.id(), action: originalAction } }
+        ]);
+
+        refreshRegistry();
+    };
+
+    if (choice === 'F') {
+        showCustomPrompt("Friction Label", "Conflict...", (fLab) => {
+            addIntermediateNode(fLab || "PIN", "friction");
+            closeAllModals();
+        });
+    } else if (choice === 'N') {
+        addIntermediateNode("Complication", "intermediate");
+        closeAllModals();
     }
+}
+
 
     function triggerRename() { showCustomPrompt("Rename Label", "Label...", (val) => { if(val) activeEdge.data('action', val); }); }
 
