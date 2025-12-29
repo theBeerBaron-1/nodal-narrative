@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v37</title>
+    <title>Narrative Systems Engine v39</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -20,6 +20,7 @@
         input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; font-family: inherit; }
         label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 12px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
+        .lexical-row { display: flex; gap: 5px; align-items: center; }
     </style>
 </head>
 <body>
@@ -64,17 +65,29 @@
             </div>
             <div>
                 <label>Action Family</label>
-                <select id="p-action-wheel" onchange="document.getElementById('p-action').value=this.value"></select>
-                <input id="p-action">
+                <div class="lexical-row">
+                    <select id="p-action-cat" onchange="updateSubList('action', this.value)"></select>
+                    <select id="p-action-word" onchange="document.getElementById('p-action-val').value=this.value"></select>
+                </div>
+                <input id="p-action-val">
                 <label>Emotions Family</label>
-                <select id="p-emotions-wheel" onchange="document.getElementById('p-emotions').value=this.value"></select>
-                <input id="p-emotions">
+                <div class="lexical-row">
+                    <select id="p-emotions-cat" onchange="updateSubList('emotions', this.value)"></select>
+                    <select id="p-emotions-word" onchange="document.getElementById('p-emotions-val').value=this.value"></select>
+                </div>
+                <input id="p-emotions-val">
                 <label>Immersion</label>
-                <select id="p-immersion-wheel" onchange="document.getElementById('p-immersion').value=this.value"></select>
-                <input id="p-immersion">
+                <div class="lexical-row">
+                    <select id="p-immersion-cat" onchange="updateSubList('immersion', this.value)"></select>
+                    <select id="p-immersion-word" onchange="document.getElementById('p-immersion-val').value=this.value"></select>
+                </div>
+                <input id="p-immersion-val">
                 <label>Utility</label>
-                <select id="p-utility-wheel" onchange="document.getElementById('p-utility').value=this.value"></select>
-                <input id="p-utility">
+                <div class="lexical-row">
+                    <select id="p-utility-cat" onchange="updateSubList('utility', this.value)"></select>
+                    <select id="p-utility-word" onchange="document.getElementById('p-utility-val').value=this.value"></select>
+                </div>
+                <input id="p-utility-val">
             </div>
         </div>
         <button style="margin-top: 25px; width: 100%; padding: 12px; background: #005f73; border:none; color:white; font-weight:bold;" onclick="saveAndClose()">Save & Exit</button>
@@ -88,10 +101,10 @@
     let lensMode = { type: null, name: null };
     const Y_SCALE = 60;
 
-    const families = {
-        action: { "Conflict": ["Confronts", "Attacks", "Sabotages"], "Social": ["Negotiates", "Confesses", "Persuades"], "Discovery": ["Discovers", "Infiltrates", "Explores"] },
-        emotions: { "High Energy": ["Euphoria", "Terror", "Rage"], "Low Energy": ["Melancholy", "Dread", "Despair"], "Reflective": ["Nostalgia", "Hope", "Awe"] },
-        utility: { "Structure": ["Inciting Incident", "Midpoint Pivot", "Resolution"], "Development": ["Character Intro", "Thematic Setup", "World Building"] },
+    const banks = {
+        action: { "Conflict": ["Confronts", "Attacks", "Sabotages"], "Subterfuge": ["Betrays", "Deceives", "Infiltrates"], "Social": ["Negotiates", "Confesses", "Persuades"] },
+        emotions: { "High": ["Euphoria", "Terror", "Rage"], "Low": ["Melancholy", "Dread", "Despair"], "Internal": ["Nostalgia", "Hope", "Shame"] },
+        utility: { "Structural": ["Inciting Incident", "Midpoint Pivot", "Resolution"], "Developmental": ["Character Intro", "Thematic Setup", "World Building"] },
         immersion: { "Sensory": ["Sulphurous", "Rot-sweet", "Iron-tanged"], "Visual": ["Neon-soaked", "Bleached", "Luminous"] }
     };
 
@@ -99,33 +112,38 @@
         container: document.getElementById('cy'),
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'shape': 'ellipse', 'text-wrap': 'wrap' }},
-            { selector: 'node[type="friction"]', style: { 'width': 30, 'height': 30, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top' }},
+            { selector: 'node[type="friction"]', style: { 'width': 35, 'height': 35, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top' }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }},
             { selector: '.ghost', style: { 'opacity': 0.02, 'text-opacity': 0 }},
             { selector: '.lens-highlight', style: { 'border-width': 8, 'border-color': '#00d4ff', 'line-color': '#00d4ff', 'width': 8, 'opacity': 1, 'text-opacity': 1 }}
         ]
     });
 
-    function populateWheels() {
-        ['action', 'emotions', 'immersion', 'utility'].forEach(key => {
-            const select = document.getElementById(`p-${key}-wheel`);
-            select.innerHTML = '<option value="">Select Category...</option>';
-            for (let group in families[key]) {
-                let optgroup = document.createElement('optgroup');
-                optgroup.label = group;
-                families[key][group].forEach(word => {
-                    let opt = document.createElement('option');
-                    opt.value = word; opt.innerText = word;
-                    optgroup.appendChild(opt);
-                });
-                select.appendChild(optgroup);
-            }
+    function populateCategories() {
+        ['action', 'emotions', 'utility', 'immersion'].forEach(key => {
+            const catSelect = document.getElementById(`p-${key}-cat`);
+            catSelect.innerHTML = '<option value="">Family...</option>';
+            Object.keys(banks[key]).forEach(cat => {
+                let opt = document.createElement('option');
+                opt.value = cat; opt.innerText = cat; catSelect.appendChild(opt);
+            });
+        });
+    }
+
+    function updateSubList(key, category) {
+        const wordSelect = document.getElementById(`p-${key}-word`);
+        wordSelect.innerHTML = '<option value="">Word...</option>';
+        if (!category) return;
+        banks[key][category].forEach(word => {
+            let opt = document.createElement('option');
+            opt.value = word; opt.innerText = word; wordSelect.appendChild(opt);
         });
     }
 
     function showCustomPrompt(title, placeholder, callback) {
         document.querySelector('.overlay').style.display = 'block';
-        document.getElementById('prompt-modal').style.display = 'block';
+        const modal = document.getElementById('prompt-modal');
+        modal.style.display = 'block';
         document.getElementById('modal-title').innerText = title;
         const input = document.getElementById('modal-input');
         input.value = ''; input.placeholder = placeholder;
@@ -134,7 +152,7 @@
 
     function addNode() {
         const id = 'n' + Date.now();
-        cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444' }, position: { x: (cy.nodes().filter('[type!="friction"]').length * 220) + 100, y: window.innerHeight/2 } });
+        cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444', characters: [], settings: [] }, position: { x: (cy.nodes().filter('[type!="friction"]').length * 220) + 100, y: window.innerHeight/2 } });
     }
 
     cy.on('tap', 'node', function(evt){
@@ -162,46 +180,39 @@
         document.getElementById('connector-modal').style.display = 'block';
     });
 
-function handleConnectorChoice(choice) {
-    const edge = activeEdge;
-    const sNode = edge.source();
-    const tNode = edge.target();
-    const originalAction = edge.data('action');
+    function handleConnectorChoice(choice) {
+        const edge = activeEdge;
+        const sNode = edge.source();
+        const tNode = edge.target();
+        const originalAction = edge.data('action');
 
-    const midX = (sNode.position().x + tNode.position().x) / 2;
-    const midY = (sNode.position().y + tNode.position().y) / 2;
+        const midX = (sNode.position().x + tNode.position().x) / 2;
+        const midY = (sNode.position().y + tNode.position().y) / 2;
 
-    if (choice === 'F') {
-        showCustomPrompt("Friction Label", "e.g. Conflict", (fLab) => {
-            const frictionId = 'f' + Date.now();
+        if (choice === 'F') {
+            showCustomPrompt("Friction Label", "e.g. Conflict", (fLab) => {
+                const frictionId = 'f' + Date.now();
+                cy.remove(edge);
+                cy.add({ 
+                    group: 'nodes', 
+                    data: { id: frictionId, type: "friction", label: fLab || "PIN", characters: [], settings: [] }, 
+                    position: { x: midX, y: midY } 
+                });
+                cy.add([{ group: 'edges', data: { source: sNode.id(), target: frictionId, action: "friction" } },{ group: 'edges', data: { source: frictionId, target: tNode.id(), action: originalAction } }]);
+            });
+        } else if (choice === 'N') {
+            const midId = 'n' + Date.now();
             cy.remove(edge);
             cy.add({ 
                 group: 'nodes', 
-                data: { id: frictionId, type: "friction", label: fLab || "PIN", characters: [], settings: [] }, 
+                data: { id: midId, label: "Complication", score: 0, color: '#444', characters: [], settings: [] }, 
                 position: { x: midX, y: midY } 
             });
-            cy.add([
-                { group: 'edges', data: { source: sNode.id(), target: frictionId, action: "friction" } },
-                { group: 'edges', data: { source: frictionId, target: tNode.id(), action: originalAction } }
-            ]);
-        });
-    } else if (choice === 'N') {
-        const midId = 'n' + Date.now();
-        cy.remove(edge);
-        // FORCE: Initializing with empty arrays to prevent 'undefined' during lens application
-        cy.add({ 
-            group: 'nodes', 
-            data: { id: midId, label: "Complication", score: 0, color: '#444', characters: [], settings: [] }, 
-            position: { x: midX, y: midY } 
-        });
-        cy.add([
-            { group: 'edges', data: { source: sNode.id(), target: midId, action: "leads to" } },
-            { group: 'edges', data: { source: midId, target: tNode.id(), action: originalAction } }
-        ]);
+            cy.add([{ group: 'edges', data: { source: sNode.id(), target: midId, action: "leads to" } }, { group: 'edges', data: { source: midId, target: tNode.id(), action: originalAction } }]);
+        }
+        closeAllModals();
+        refreshRegistry();
     }
-    closeAllModals();
-    refreshRegistry(); // Ensure the registry sees new nodes immediately
-}
 
     function triggerRename() {
         showCustomPrompt("Rename Label", "New action text...", (val) => { if(val) activeEdge.data('action', val); });
@@ -209,14 +220,13 @@ function handleConnectorChoice(choice) {
 
     function openInspector(n) {
         activeNode = n; const d = n.data();
-        populateWheels();
+        populateCategories();
         document.getElementById('inspector-popup').style.display = 'block';
         document.querySelector('.overlay').style.display = 'block';
-        ['label', 'score', 'char', 'set', 'action', 'emotions', 'immersion', 'utility'].forEach(f => {
-            let el = document.getElementById('p-' + f);
-            if (f === 'char' || f === 'set') el.value = (d[f + 'acters'] || d[f + 'tings'] || []).join(', ');
-            else el.value = d[f] || (f==='score'?0:'');
-        });
+        ['label', 'score', 'char', 'set'].forEach(f => document.getElementById('p-'+f).value = d[f] || (f==='score'?0:''));
+        ['action', 'emotions', 'immersion', 'utility'].forEach(f => document.getElementById('p-'+f+'-val').value = d[f] || '');
+        document.getElementById('p-char').value = (d.characters || []).join(', ');
+        document.getElementById('p-set').value = (d.settings || []).join(', ');
     }
 
     function saveAndClose() {
@@ -228,10 +238,10 @@ function handleConnectorChoice(choice) {
         activeNode.data({
             label: document.getElementById('p-label').value, score: score,
             characters: chars, settings: sets,
-            action: document.getElementById('p-action').value,
-            emotions: document.getElementById('p-emotions').value,
-            immersion: document.getElementById('p-immersion').value,
-            utility: document.getElementById('p-utility').value,
+            action: document.getElementById('p-action-val').value,
+            emotions: document.getElementById('p-emotions-val').value,
+            immersion: document.getElementById('p-immersion-val').value,
+            utility: document.getElementById('p-utility-val').value,
             color: nPos(score)
         });
         activeNode.position('y', (window.innerHeight/2) - (score * Y_SCALE));
@@ -244,16 +254,23 @@ function handleConnectorChoice(choice) {
     function applyLens(type, name) {
         lensMode = { type: type, name: name };
         const dataKey = type === 'characters' ? 'characters' : 'settings';
-        
+        const targetName = name.trim().toLowerCase();
+
         cy.elements().removeClass('lens-highlight').addClass('ghost');
         
-        const matchingNodes = cy.nodes().filter(n => (n.data(dataKey) || []).includes(name));
-        matchingNodes.removeClass('ghost').addClass('lens-highlight');
+        const matches = cy.nodes().filter(n => {
+            const list = n.data(dataKey) || [];
+            return list.some(item => item.trim().toLowerCase() === targetName);
+        });
+
+        matches.removeClass('ghost').addClass('lens-highlight');
 
         cy.edges().forEach(e => {
-            const hasS = (e.source().data(dataKey) || []).includes(name);
-            const hasT = (e.target().data(dataKey) || []).includes(name);
-            if (hasS && hasT) e.removeClass('ghost').addClass('lens-highlight');
+            const sList = e.source().data(dataKey) || [];
+            const tList = e.target().data(dataKey) || [];
+            if (sList.some(i => i.trim().toLowerCase() === targetName) && tList.some(i => i.trim().toLowerCase() === targetName)) {
+                e.removeClass('ghost').addClass('lens-highlight');
+            }
         });
         refreshRegistry();
     }
@@ -261,10 +278,21 @@ function handleConnectorChoice(choice) {
     function clearHighlights() {
         lensMode = { type: null, name: null };
         cy.elements().removeClass('ghost').removeClass('lens-highlight');
-        // RE-FIX: Hard re-application of base shapes to prevent ellipse warping
-        cy.nodes().style({'width': 80, 'height': 80, 'shape': 'ellipse', 'opacity': 1, 'text-opacity': 1});
-        cy.nodes('[type="friction"]').style({'width': 30, 'height': 30, 'shape': 'diamond'});
-        cy.edges().style({'line-color': '#333', 'width': 4, 'opacity': 1});
+        
+        // RE-FIX: Hard reset to ensure shapes don't warp into ellipses
+        cy.nodes().forEach(n => {
+            const baseW = n.data('type') === 'friction' ? 35 : 80;
+            const shape = n.data('type') === 'friction' ? 'diamond' : 'ellipse';
+            n.style({
+                'width': baseW,
+                'height': baseW,
+                'shape': shape,
+                'opacity': 1,
+                'text-opacity': 1,
+                'border-width': 0
+            });
+        });
+        cy.edges().style({ 'line-color': '#333', 'width': 4, 'opacity': 1 });
         refreshRegistry();
     }
 
@@ -288,8 +316,8 @@ function handleConnectorChoice(choice) {
     }
 
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
-    function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; }
-    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v37.json"; a.click(); }
+    function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; if(sourceNode) sourceNode.unselect(); sourceNode = null; }
+    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v39.json"; a.click(); }
     function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
 </body>
