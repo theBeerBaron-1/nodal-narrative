@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v44</title>
+    <title>Narrative Systems Engine v43</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -27,9 +27,9 @@
 
 <div id="connector-modal" class="custom-modal">
     <h3 style="color:#00d4ff; margin:0 0 15px 0;">Connector Action</h3>
-    <button onclick="triggerRename()" style="width:100%; padding:12px; margin-bottom:8px;">✎ Rename Label</button>
-    <button onclick="handleConnectorChoice('N')" style="width:100%; padding:12px; margin-bottom:8px;">+ Add Complication Node</button>
-    <button onclick="handleConnectorChoice('F')" style="width:100%; padding:12px;">⚠ Apply Friction to Edge</button>
+    <button onclick="triggerRename()" style="width:100%; padding:12px; margin-bottom:8px;">✎ Rename Action</button>
+    <button onclick="handleConnectorChoice('F')" style="width:100%; padding:12px; margin-bottom:8px;">⚠ Add/Edit Friction</button>
+    <button onclick="handleConnectorChoice('N')" style="width:100%; padding:12px;">+ Add Complication Node</button>
 </div>
 
 <div id="prompt-modal" class="custom-modal">
@@ -101,7 +101,7 @@
     const Y_SCALE = 60;
 
     const banks = {
-        action: { "Conflict": ["Confronts", "Attacks", "Sabotages"], "Subterfuge": ["Betrays", "Deceives", "Infiltrates"], "Social": ["Negotiates", "Confesses", "Persuades"] },
+        action: { "Conflict": ["Confronts", "Attacks", "Sabotages"], "Subterfuge": ["Betrays", "Deceives", "Infiltrates"], "Social": ["Negotiates", "Confessions", "Persuades"] },
         emotions: { "High": ["Euphoria", "Terror", "Rage"], "Low": ["Melancholy", "Dread", "Despair"], "Internal": ["Nostalgia", "Hope", "Shame"] },
         utility: { "Structural": ["Inciting Incident", "Midpoint Pivot", "Resolution"], "Developmental": ["Character Intro", "Thematic Setup", "World Building"] },
         immersion: { "Sensory": ["Sulphurous", "Rot-sweet", "Iron-tanged"], "Visual": ["Neon-soaked", "Bleached", "Luminous"] }
@@ -112,7 +112,7 @@
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'shape': 'ellipse', 'text-wrap': 'wrap' }},
             { selector: 'edge', style: { 
-                'width': 4, 
+                'width': 3, 
                 'line-color': '#333', 
                 'target-arrow-shape': 'triangle', 
                 'label': 'data(action)', 
@@ -120,14 +120,17 @@
                 'curve-style': 'bezier', 
                 'font-size': '11px', 
                 'text-background-opacity': 1, 
-                'text-background-color': '#0f0f0f' 
+                'text-background-color': '#0f0f0f',
+                'text-margin-y': -10
             }},
-            { selector: 'edge[isFriction]', style: { 
-                'line-color': '#ff4500', 
-                'color': '#ff4500', 
-                'width': 6,
+            { selector: 'edge[friction]', style: { 
+                'source-label': 'data(friction)',
+                'source-text-offset': 40,
+                'source-text-rotation': 'none',
+                'color': '#ff4500',
                 'font-weight': 'bold',
-                'label': 'data(action)' 
+                'text-outline-color': '#0f0f0f',
+                'text-outline-width': 2
             }},
             { selector: '.ghost', style: { 'opacity': 0.01, 'text-opacity': 0 }},
             { selector: '.lens-highlight', style: { 'border-width': 8, 'border-color': '#00d4ff', 'line-color': '#00d4ff', 'width': 8, 'opacity': 1, 'text-opacity': 1 }}
@@ -208,34 +211,23 @@
 
     function handleConnectorChoice(choice) {
         if (!activeEdge) return;
-        const edge = activeEdge;
-
         if (choice === 'F') {
-            showCustomPrompt("Friction Label", "Conflict...", (fLab) => {
-                if(fLab) {
-                    edge.data('action', fLab.toUpperCase());
-                    edge.data('isFriction', true);
-                }
+            showCustomPrompt("Friction Context", "Hindrance...", (fVal) => {
+                if (fVal) activeEdge.data('friction', fVal.toUpperCase());
+                else activeEdge.removeData('friction');
                 closeAllModals();
             });
         } else if (choice === 'N') {
+            const edge = activeEdge;
             const sNode = edge.source();
             const tNode = edge.target();
             const originalAction = edge.data('action');
             const midX = (sNode.position().x + tNode.position().x) / 2;
             const midY = (sNode.position().y + tNode.position().y) / 2;
             const midId = 'i' + Date.now();
-
             cy.remove(edge);
-            cy.add({
-                group: 'nodes',
-                data: { id: midId, label: "Complication", type: "intermediate", score: 0, color: '#444', characters: [], settings: [] },
-                position: { x: midX, y: midY + 50 }
-            });
-            cy.add([
-                { group: 'edges', data: { source: sNode.id(), target: midId, action: "leads to" } },
-                { group: 'edges', data: { source: midId, target: tNode.id(), action: originalAction } }
-            ]);
+            cy.add({ group: 'nodes', data: { id: midId, label: "Complication", type: "intermediate", score: 0, color: '#444' }, position: { x: midX, y: midY + 50 } });
+            cy.add([{ group: 'edges', data: { source: sNode.id(), target: midId, action: "leads to" } }, { group: 'edges', data: { source: midId, target: tNode.id(), action: originalAction } }]);
             closeAllModals();
         }
     }
@@ -252,14 +244,7 @@
         highlightedNodes = [];
     }
 
-    function triggerRename() { 
-        showCustomPrompt("Rename Label", "Label...", (val) => { 
-            if(val) {
-                activeEdge.data('action', val);
-                activeEdge.removeData('isFriction'); // Clears friction style on manual rename if desired
-            }
-        }); 
-    }
+    function triggerRename() { showCustomPrompt("Rename Action", "Label...", (val) => { if(val) activeEdge.data('action', val); }); }
 
     function openInspector(n) {
         activeNode = n; const d = n.data(); populateCategories();
@@ -296,10 +281,7 @@
     function clearHighlights() {
         lensMode = { type: null, name: null }; cy.elements().removeClass('ghost').removeClass('lens-highlight');
         cy.nodes().forEach(n => { n.style({ 'width': 80, 'height': 80, 'shape': 'ellipse', 'opacity': 1, 'border-width': 0 }); });
-        cy.edges().forEach(e => {
-            const color = e.data('isFriction') ? '#ff4500' : '#333';
-            e.style({ 'line-color': color, 'width': e.data('isFriction') ? 6 : 4, 'opacity': 1 });
-        });
+        cy.edges().forEach(e => { e.style({ 'line-color': '#333', 'width': 3, 'opacity': 1 }); });
         refreshRegistry();
     }
 
