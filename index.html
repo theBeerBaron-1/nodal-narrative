@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v43</title>
+    <title>Narrative Systems Engine v44</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -11,19 +11,28 @@
         .registry-item { background: #222; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #00d4ff; cursor: pointer; transition: 0.2s; }
         .registry-item.active-lens { border-left-color: #fff; background: #005f73; box-shadow: 0 0 15px #00d4ff; }
         .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 3000; box-shadow: 0 0 60px #000; width: 450px; }
-        #inspector-popup { width: 850px; z-index: 2000; }
-        .pop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        #inspector-popup { width: 450px; z-index: 2000; } /* Narrowed for the single column style */
         .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 10px; border-radius: 8px; border: 1px solid #333; }
         button { cursor: pointer; padding: 6px 12px; margin: 2px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 11px; }
         input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; font-family: inherit; }
         label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 12px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
-        .lexical-row { display: flex; gap: 5px; align-items: center; }
+        
+        /* New Precision Menu Styles */
+        .lexical-field-row { display: flex; align-items: flex-end; gap: 8px; }
+        .icon-trigger { cursor: pointer; background: #333; border: 1px solid #555; border-radius: 4px; padding: 8px; font-size: 14px; transition: 0.2s; display: flex; align-items: center; justify-content: center; min-width: 35px; }
+        .icon-trigger:hover { background: #00d4ff; color: #000; }
+        #precision-menu { position: absolute; background: #1a1a1a; border: 1px solid #00d4ff; border-radius: 4px; z-index: 4000; display: none; max-height: 300px; overflow-y: auto; width: 180px; box-shadow: 0 5px 20px #000; }
+        .menu-item { padding: 8px 12px; cursor: pointer; font-size: 12px; border-bottom: 1px solid #333; }
+        .menu-item:hover { background: #005f73; }
+        .menu-header { font-size: 9px; color: #00d4ff; padding: 4px 12px; background: #111; text-transform: uppercase; letter-spacing: 1px; }
     </style>
 </head>
 <body>
 
 <div class="overlay" onclick="closeAllModals()"></div>
+
+<div id="precision-menu"></div>
 
 <div id="connector-modal" class="custom-modal">
     <h3 style="color:#00d4ff; margin:0 0 15px 0;">Connector Action</h3>
@@ -54,40 +63,21 @@
 
     <div id="inspector-popup" class="custom-modal">
         <h3 style="margin: 0 0 15px 0; color: #00d4ff;">SCENE FOCUS</h3>
-        <div class="pop-grid">
-            <div>
-                <label>Scene Label</label><input id="p-label">
-                <label>Emotional Score (-10 to 10)</label><input type="number" id="p-score">
-                <label>Characters</label><input id="p-char">
-                <label>Settings</label><input id="p-set">
-            </div>
-            <div>
-                <label>Action Family</label>
-                <div class="lexical-row">
-                    <select id="p-action-cat" onchange="updateSubList('action', this.value)"></select>
-                    <select id="p-action-word" onchange="document.getElementById('p-action-val').value=this.value"></select>
-                </div>
-                <input id="p-action-val">
-                <label>Emotions Family</label>
-                <div class="lexical-row">
-                    <select id="p-emotions-cat" onchange="updateSubList('emotions', this.value)"></select>
-                    <select id="p-emotions-word" onchange="document.getElementById('p-emotions-val').value=this.value"></select>
-                </div>
-                <input id="p-emotions-val">
-                <label>Immersion</label>
-                <div class="lexical-row">
-                    <select id="p-immersion-cat" onchange="updateSubList('immersion', this.value)"></select>
-                    <select id="p-immersion-word" onchange="document.getElementById('p-immersion-val').value=this.value"></select>
-                </div>
-                <input id="p-immersion-val">
-                <label>Utility</label>
-                <div class="lexical-row">
-                    <select id="p-utility-cat" onchange="updateSubList('utility', this.value)"></select>
-                    <select id="p-utility-word" onchange="document.getElementById('p-utility-val').value=this.value"></select>
-                </div>
-                <input id="p-utility-val">
-            </div>
+        <label>Scene Label</label><input id="p-label">
+        <label>Emotional Score (-10 to 10)</label><input type="number" id="p-score">
+        
+        <label>Descriptor Value (Action / Emotion / Sensory)</label>
+        <div class="lexical-field-row">
+            <input id="p-master-val" placeholder="Select or type details...">
+            <div class="icon-trigger" title="Action" onclick="openPrecision(event, 'action')">⚡</div>
+            <div class="icon-trigger" title="Emotion" onclick="openPrecision(event, 'emotions')">🎭</div>
+            <div class="icon-trigger" title="Immersion" onclick="openPrecision(event, 'immersion')">🌊</div>
+            <div class="icon-trigger" title="Utility" onclick="openPrecision(event, 'utility')">🛠</div>
         </div>
+
+        <label>Characters</label><input id="p-char">
+        <label>Settings</label><input id="p-set">
+        
         <button style="margin-top: 25px; width: 100%; padding: 12px; background: #005f73; border:none; color:white; font-weight:bold;" onclick="saveAndClose()">Save & Exit</button>
     </div>
 </div>
@@ -101,10 +91,25 @@
     const Y_SCALE = 60;
 
     const banks = {
-        action: { "Conflict": ["Confronts", "Attacks", "Sabotages"], "Subterfuge": ["Betrays", "Deceives", "Infiltrates"], "Social": ["Negotiates", "Confessions", "Persuades"] },
-        emotions: { "High": ["Euphoria", "Terror", "Rage"], "Low": ["Melancholy", "Dread", "Despair"], "Internal": ["Nostalgia", "Hope", "Shame"] },
-        utility: { "Structural": ["Inciting Incident", "Midpoint Pivot", "Resolution"], "Developmental": ["Character Intro", "Thematic Setup", "World Building"] },
-        immersion: { "Sensory": ["Sulphurous", "Rot-sweet", "Iron-tanged"], "Visual": ["Neon-soaked", "Bleached", "Luminous"] }
+        action: { 
+            "Direct": ["Confronts", "Attacks", "Demands"], 
+            "Indirect": ["Deceives", "Persuades", "Subverts"], 
+            "Defensive": ["Resists", "Withholds", "Protects"] 
+        },
+        emotions: { 
+            "Positive": ["Hopeful", "Joyful", "Relieved"], 
+            "Negative": ["Fearful", "Angry", "Dreadful"], 
+            "Conflict": ["Doubtful", "Shameful", "Confused"] 
+        },
+        immersion: { 
+            "Physical": ["Harsh", "Dirty", "Cold"], 
+            "Atmospheric": ["Bright", "Shadowy", "Luminous"], 
+            "Sensory": ["Stink", "Fragrant", "Sharp"] 
+        },
+        utility: { 
+            "Structural": ["Inciting Incident", "Midpoint Pivot", "Resolution"], 
+            "Developmental": ["Character Intro", "Thematic Setup", "World Building"] 
+        }
     };
 
     var cy = cytoscape({
@@ -112,30 +117,53 @@
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'shape': 'ellipse', 'text-wrap': 'wrap' }},
             { selector: 'edge', style: { 
-                'width': 3, 
-                'line-color': '#333', 
-                'target-arrow-shape': 'triangle', 
-                'label': 'data(action)', 
-                'color': '#00d4ff', 
-                'curve-style': 'bezier', 
-                'font-size': '11px', 
-                'text-background-opacity': 1, 
-                'text-background-color': '#0f0f0f',
-                'text-margin-y': -10
+                'width': 3, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 
+                'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f', 'text-margin-y': -10
             }},
             { selector: 'edge[friction]', style: { 
-                'source-label': 'data(friction)',
-                'source-text-offset': 40,
-                'source-text-rotation': 'none',
-                'color': '#ff4500',
-                'font-weight': 'bold',
-                'text-outline-color': '#0f0f0f',
-                'text-outline-width': 2
+                'source-label': 'data(friction)', 'source-text-offset': 40, 'color': '#ff4500', 'font-weight': 'bold', 'text-outline-color': '#0f0f0f', 'text-outline-width': 2
             }},
             { selector: '.ghost', style: { 'opacity': 0.01, 'text-opacity': 0 }},
             { selector: '.lens-highlight', style: { 'border-width': 8, 'border-color': '#00d4ff', 'line-color': '#00d4ff', 'width': 8, 'opacity': 1, 'text-opacity': 1 }}
         ]
     });
+
+    function openPrecision(event, bankKey) {
+        const menu = document.getElementById('precision-menu');
+        const trigger = event.currentTarget;
+        const rect = trigger.getBoundingClientRect();
+        
+        menu.style.display = 'block';
+        menu.style.top = (rect.bottom + window.scrollY) + 'px';
+        menu.style.left = rect.left + 'px';
+        
+        renderCategories(bankKey);
+    }
+
+    function renderCategories(bankKey) {
+        const menu = document.getElementById('precision-menu');
+        let html = `<div class="menu-header">${bankKey}</div>`;
+        Object.keys(banks[bankKey]).forEach(cat => {
+            html += `<div class="menu-item" onclick="renderSpecifics('${bankKey}', '${cat}')">${cat} ➔</div>`;
+        });
+        menu.innerHTML = html;
+    }
+
+    function renderSpecifics(bankKey, category) {
+        const menu = document.getElementById('precision-menu');
+        let html = `<div class="menu-header">${category}</div>`;
+        html += `<div class="menu-item" style="color:#888" onclick="renderCategories('${bankKey}')">⬅ Back</div>`;
+        banks[bankKey][category].forEach(word => {
+            html += `<div class="menu-item" onclick="selectWord('${word}')">${word}</div>`;
+        });
+        menu.innerHTML = html;
+    }
+
+    function selectWord(word) {
+        const input = document.getElementById('p-master-val');
+        input.value = input.value ? input.value + ", " + word : word;
+        document.getElementById('precision-menu').style.display = 'none';
+    }
 
     window.onload = function() {
         const h = window.innerHeight / 2;
@@ -144,41 +172,9 @@
             { group: 'nodes', data: { id: 'end', label: 'End', score: 8, color: nPos(8), characters: ['Alpha'], settings: ['Base'] }, position: { x: 600, y: h - (8 * Y_SCALE) } },
             { group: 'edges', data: { source: 'start', target: 'end', action: 'Wants' } }
         ]);
-        registry.characters['Alpha'] = { h1: '', h2: '', desc: '' };
-        registry.settings['Base'] = { h1: '', h2: '', desc: '' };
         refreshRegistry();
         cy.fit(null, 50);
     };
-
-    function populateCategories() {
-        ['action', 'emotions', 'utility', 'immersion'].forEach(key => {
-            const catSelect = document.getElementById(`p-${key}-cat`);
-            catSelect.innerHTML = '<option value="">Family...</option>';
-            Object.keys(banks[key]).forEach(cat => {
-                let opt = document.createElement('option');
-                opt.value = cat; opt.innerText = cat; catSelect.appendChild(opt);
-            });
-        });
-    }
-
-    function updateSubList(key, category) {
-        const wordSelect = document.getElementById(`p-${key}-word`);
-        wordSelect.innerHTML = '<option value="">Word...</option>';
-        if (!category) return;
-        banks[key][category].forEach(word => {
-            let opt = document.createElement('option');
-            opt.value = word; opt.innerText = word; wordSelect.appendChild(opt);
-        });
-    }
-
-    function showCustomPrompt(title, placeholder, callback) {
-        document.querySelector('.overlay').style.display = 'block';
-        document.getElementById('prompt-modal').style.display = 'block';
-        document.getElementById('modal-title').innerText = title;
-        const input = document.getElementById('modal-input');
-        input.value = ''; input.placeholder = placeholder;
-        document.getElementById('modal-confirm').onclick = () => { callback(input.value); closeAllModals(); };
-    }
 
     function addNode() {
         const id = 'n' + Date.now();
@@ -187,10 +183,8 @@
 
     cy.on('tap', 'node', function(evt){
         let n = evt.target;
-        if (!sourceNode) { 
-            sourceNode = n; 
-            highlightNode(n);
-        } else {
+        if (!sourceNode) { sourceNode = n; highlightNode(n); } 
+        else {
             if (sourceNode.id() === n.id()) { openInspector(n); } 
             else {
                 const s = sourceNode;
@@ -198,8 +192,7 @@
                     if (val) cy.add({ group: 'edges', data: { source: s.id(), target: n.id(), action: val } });
                 });
             }
-            resetHighlights();
-            sourceNode = null;
+            resetHighlights(); sourceNode = null;
         }
     });
 
@@ -218,22 +211,42 @@
                 closeAllModals();
             });
         } else if (choice === 'N') {
-            const edge = activeEdge;
-            const sNode = edge.source();
-            const tNode = edge.target();
-            const originalAction = edge.data('action');
-            const midX = (sNode.position().x + tNode.position().x) / 2;
-            const midY = (sNode.position().y + tNode.position().y) / 2;
-            const midId = 'i' + Date.now();
+            const edge = activeEdge, sNode = edge.source(), tNode = edge.target();
+            const midX = (sNode.position().x + tNode.position().x) / 2, midY = (sNode.position().y + tNode.position().y) / 2, midId = 'i' + Date.now();
             cy.remove(edge);
             cy.add({ group: 'nodes', data: { id: midId, label: "Complication", type: "intermediate", score: 0, color: '#444' }, position: { x: midX, y: midY + 50 } });
-            cy.add([{ group: 'edges', data: { source: sNode.id(), target: midId, action: "leads to" } }, { group: 'edges', data: { source: midId, target: tNode.id(), action: originalAction } }]);
+            cy.add([{ group: 'edges', data: { source: sNode.id(), target: midId, action: "leads to" } }, { group: 'edges', data: { source: midId, target: tNode.id(), action: edge.data('action') } }]);
             closeAllModals();
         }
     }
 
+    function openInspector(n) {
+        activeNode = n; const d = n.data();
+        document.getElementById('inspector-popup').style.display = 'block';
+        document.querySelector('.overlay').style.display = 'block';
+        document.getElementById('p-label').value = d.label || '';
+        document.getElementById('p-score').value = d.score || 0;
+        document.getElementById('p-master-val').value = d.masterVal || '';
+        document.getElementById('p-char').value = (d.characters || []).join(', ');
+        document.getElementById('p-set').value = (d.settings || []).join(', ');
+    }
+
+    function saveAndClose() {
+        if (!activeNode) return;
+        const score = document.getElementById('p-score').value;
+        const chars = document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s);
+        const sets = document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s);
+        activeNode.data({ 
+            label: document.getElementById('p-label').value, score: score, characters: chars, settings: sets, 
+            masterVal: document.getElementById('p-master-val').value, color: nPos(score) 
+        });
+        activeNode.position('y', (window.innerHeight/2) - (score * Y_SCALE));
+        chars.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { h1: '', h2: '', desc: '' }; });
+        sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { h1: '', h2: '', desc: '' }; });
+        refreshRegistry(); closeAllModals();
+    }
+
     function highlightNode(node) {
-        if (!node) return;
         node.scratch('origStyle', { 'border-width': node.style('border-width'), 'border-color': node.style('border-color'), 'width': node.style('width'), 'height': node.style('height') });
         node.style({ 'border-width': 6, 'border-color': '#00d4ff', 'width': parseFloat(node.style('width')) * 1.2, 'height': parseFloat(node.style('height')) * 1.2 });
         highlightedNodes.push(node);
@@ -245,28 +258,23 @@
     }
 
     function triggerRename() { showCustomPrompt("Rename Action", "Label...", (val) => { if(val) activeEdge.data('action', val); }); }
-
-    function openInspector(n) {
-        activeNode = n; const d = n.data(); populateCategories();
-        document.getElementById('inspector-popup').style.display = 'block';
-        document.querySelector('.overlay').style.display = 'block';
-        ['label', 'score'].forEach(f => document.getElementById('p-'+f).value = d[f] || (f==='score'?0:''));
-        ['action', 'emotions', 'immersion', 'utility'].forEach(f => document.getElementById('p-'+f+'-val').value = d[f] || '');
-        document.getElementById('p-char').value = (d.characters || []).join(', ');
-        document.getElementById('p-set').value = (d.settings || []).join(', ');
+    function closeAllModals() { 
+        document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); 
+        document.querySelector('.overlay').style.display = 'none'; 
+        document.getElementById('precision-menu').style.display = 'none';
+        activeNode = null; activeEdge = null; sourceNode = null; 
     }
 
-    function saveAndClose() {
-        if (!activeNode) return;
-        const score = document.getElementById('p-score').value;
-        const chars = document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s);
-        const sets = document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s);
-        activeNode.data({ label: document.getElementById('p-label').value, score: score, characters: chars, settings: sets, action: document.getElementById('p-action-val').value, emotions: document.getElementById('p-emotions-val').value, immersion: document.getElementById('p-immersion-val').value, utility: document.getElementById('p-utility-val').value, color: nPos(score) });
-        activeNode.position('y', (window.innerHeight/2) - (score * Y_SCALE));
-        chars.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { h1: '', h2: '', desc: '' }; });
-        sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { h1: '', h2: '', desc: '' }; });
-        refreshRegistry(); closeAllModals();
-        if(lensMode.name) applyLens(lensMode.type, lensMode.name);
+    function refreshRegistry() {
+        let html = '';
+        ['characters', 'settings'].forEach(type => {
+            html += `<h4 style="color:#00d4ff; margin-bottom:5px;">${type.toUpperCase()}</h4>`;
+            for (let name in registry[type]) {
+                const active = (lensMode.type === type && lensMode.name === name) ? 'active-lens' : '';
+                html += `<div class="registry-item ${active}" onclick="applyLens('${type}', '${name}')"><strong>${name}</strong><textarea placeholder="Descriptor..." onclick="event.stopPropagation()" onchange="registry.${type}['${name}'].desc=this.value">${registry[type][name].desc||''}</textarea></div>`;
+            }
+        });
+        document.getElementById('registry-content').innerHTML = html;
     }
 
     function applyLens(type, name) {
@@ -274,7 +282,6 @@
         cy.elements().removeClass('lens-highlight').addClass('ghost');
         const matches = cy.nodes().filter(n => { const list = n.data(dataKey) || []; return list.some(item => item.trim().toLowerCase() === targetName); });
         matches.removeClass('ghost').addClass('lens-highlight');
-        cy.edges().forEach(e => { const sL = e.source().data(dataKey) || []; const tL = e.target().data(dataKey) || []; if (sL.some(i => i.trim().toLowerCase() === targetName) && tL.some(i => i.trim().toLowerCase() === targetName)) e.removeClass('ghost').addClass('lens-highlight'); });
         refreshRegistry();
     }
 
@@ -285,20 +292,15 @@
         refreshRegistry();
     }
 
-    function refreshRegistry() {
-        let html = '';
-        ['characters', 'settings'].forEach(type => {
-            html += `<h4 style="color:#00d4ff; margin-bottom:5px;">${type.toUpperCase()}</h4>`;
-            for (let name in registry[type]) {
-                const active = (lensMode.type === type && lensMode.name === name) ? 'active-lens' : '';
-                html += `<div class="registry-item ${active}" onclick="applyLens('${type}', '${name}')"><strong>${name}</strong><div style="display:flex; gap:5px; margin:5px 0;" onclick="event.stopPropagation()"><input placeholder="Hybrid A" value="${registry[type][name].h1||''}" onchange="registry.${type}['${name}'].h1=this.value; refreshRegistry()"><input placeholder="Hybrid B" value="${registry[type][name].h2||''}" onchange="registry.${type}['${name}'].h2=this.value; refreshRegistry()"></div><textarea placeholder="Descriptor..." onclick="event.stopPropagation()" onchange="registry.${type}['${name}'].desc=this.value">${registry[type][name].desc||''}</textarea></div>`;
-            }
-        });
-        document.getElementById('registry-content').innerHTML = html;
-    }
-
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
-    function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; sourceNode = null; }
+    function showCustomPrompt(title, placeholder, callback) {
+        document.querySelector('.overlay').style.display = 'block';
+        document.getElementById('prompt-modal').style.display = 'block';
+        document.getElementById('modal-title').innerText = title;
+        const input = document.getElementById('modal-input');
+        input.value = ''; input.placeholder = placeholder;
+        document.getElementById('modal-confirm').onclick = () => { callback(input.value); closeAllModals(); };
+    }
     function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v43.json"; a.click(); }
     function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
