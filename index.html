@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v25</title>
+    <title>Narrative Systems Engine v26</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -9,20 +9,16 @@
         #cy { flex-grow: 1; background: #0f0f0f; }
         #registry-panel { width: 400px; background: #151515; border-left: 1px solid #333; padding: 20px; overflow-y: auto; }
         .registry-item { background: #222; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #00d4ff; }
-        
-        /* Custom Modals */
-        .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 2100; box-shadow: 0 0 60px #000; width: 450px; }
-        #inspector-popup { width: 850px; z-index: 2000; }
-        #wheel-modal { width: 350px; max-height: 80vh; overflow-y: auto; z-index: 2500; }
-        #edge-menu-modal { width: 300px; text-align: center; }
-
+        .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 2500; box-shadow: 0 0 60px #000; width: 450px; }
+        #inspector-popup { width: 850px; z-index: 2100; }
         .pop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 10px; border-radius: 8px; border: 1px solid #333; }
         button { cursor: pointer; padding: 6px 12px; margin: 2px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 11px; }
         input, textarea { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; }
         label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 10px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
-        .wheel-item { width:100%; text-align:left; background:#222; border:1px solid #444; color:#fff; padding:8px; margin:2px 0; border-radius:4px; cursor:pointer; }
+        .wheel-cat { background: #005f73; padding: 8px; margin: 10px 0 5px 0; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .wheel-item { width: 100%; text-align: left; background: #222; border: 1px solid #444; color: #fff; padding: 6px; margin: 2px 0; border-radius: 4px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -30,14 +26,15 @@
 <div class="overlay" onclick="closeAllModals()"></div>
 
 <div id="wheel-modal" class="custom-modal">
-    <h3 id="wheel-title" style="color:#00d4ff; margin:0 0 15px 0;">Lexical Family</h3>
+    <h3 id="wheel-title" style="color:#00d4ff; margin:0 0 15px 0;">Lexical Families</h3>
     <div id="wheel-content"></div>
 </div>
 
-<div id="edge-menu-modal" class="custom-modal">
+<div id="connector-modal" class="custom-modal">
     <h3 style="color:#00d4ff; margin:0 0 15px 0;">Connector Action</h3>
-    <button onclick="handleEdgeChoice('N')" style="width:100%; padding:10px; margin-bottom:10px;">+ Add Complication Node</button>
-    <button onclick="handleEdgeChoice('F')" style="width:100%; padding:10px;">+ Add Friction Pin</button>
+    <button onclick="triggerRename()" style="width:100%; padding:10px; margin-bottom:8px;">✎ Rename Action</button>
+    <button onclick="handleConnectorChoice('N')" style="width:100%; padding:10px; margin-bottom:8px;">+ Add Complication Node</button>
+    <button onclick="handleConnectorChoice('F')" style="width:100%; padding:10px;">+ Add Friction Pin</button>
 </div>
 
 <div id="prompt-modal" class="custom-modal">
@@ -52,8 +49,8 @@
 <div id="main-wrapper">
     <div class="controls">
         <button onclick="addNode()">+ New Scene</button>
-        <button onclick="autoZoom()">Auto-Zoom Center</button>
-        <button onclick="exportDeep()">Export JSON</button>
+        <button onclick="cy.fit(null, 50)">Auto-Zoom</button>
+        <button onclick="exportDeep()">Export Deep JSON</button>
         <button onclick="document.getElementById('importFile').click()">Import JSON</button>
         <input type="file" id="importFile" style="display:none" onchange="importDeep(event)">
     </div>
@@ -69,34 +66,33 @@
                 <label>Setting</label><input id="p-set">
             </div>
             <div>
-                <label>Action <button onclick="openWheel('action')">🔍 Wheel</button></label><input id="p-action">
-                <label>Emotions <button onclick="openWheel('emotions')">🔍 Wheel</button></label><input id="p-emotions">
-                <label>Immersion <button onclick="openWheel('immersion')">🔍 Wheel</button></label><input id="p-immersion">
-                <label>Utility <button onclick="openWheel('utility')">🔍 Wheel</button></label><input id="p-utility">
+                <label>Action <button onclick="openWheel('action')">🔍 Family</button></label><input id="p-action">
+                <label>Emotions <button onclick="openWheel('emotions')">🔍 Family</button></label><input id="p-emotions">
+                <label>Immersion <button onclick="openWheel('immersion')">🔍 Family</button></label><input id="p-immersion">
+                <label>Utility <button onclick="openWheel('utility')">🔍 Family</button></label><input id="p-utility">
             </div>
         </div>
         <button style="margin-top:25px; width:100%; padding:12px; background:#005f73; border:none; color:white; font-weight:bold;" onclick="saveAndClose()">Save & Exit</button>
     </div>
 </div>
 
-<div id="registry-panel"><h3 style="color:#00d4ff; margin-top:0;">World Registry</h3><div id="registry-content"></div></div>
+<div id="registry-panel"><h3 style="color:#00d4ff; margin:0 0 10px 0;">World Registry</h3><div id="registry-content"></div></div>
 
 <script>
     let activeNode = null, sourceNode = null, activeEdge = null, registry = { characters: {}, settings: {} };
     const Y_SCALE = 60;
 
-    const banks = {
-        utility: ["Inciting Incident", "Characterisation Shift", "Problem Escalation", "Rising Tension", "Midpoint Pivot", "Resolution", "World Building", "Thematic Setup"],
-        action: ["Confronts", "Betrays", "Escapes", "Discovers", "Negotiates", "Infiltrates", "Sacrifices", "Sabotages"],
-        emotions: ["Melancholy", "Euphoria", "Resentment", "Dread", "Anticipation", "Hope", "Terror", "Awe"],
-        immersion: ["Sulphurous", "Bleached", "Rot-sweet", "Airless", "Luminous", "Neon-soaked", "Iron-tanged", "Velvet-dark"]
+    const families = {
+        action: { "Conflict": ["Confronts", "Attacks", "Sabotages"], "Social": ["Negotiates", "Confesses", "Persuades"], "Discovery": ["Discovers", "Infiltrates", "Explores"] },
+        emotions: { "High Energy": ["Euphoria", "Terror", "Rage"], "Low Energy": ["Melancholy", "Dread", "Despair"], "Reflective": ["Nostalgia", "Hope", "Awe"] },
+        utility: { "Structure": ["Inciting Incident", "Midpoint Pivot", "Resolution"], "Development": ["Character Intro", "Thematic Setup", "World Building"] },
+        immersion: { "Sensory": ["Sulphurous", "Rot-sweet", "Iron-tanged"], "Visual": ["Neon-soaked", "Bleached", "Luminous"] }
     };
 
     var cy = cytoscape({
         container: document.getElementById('cy'),
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'text-wrap': 'wrap' }},
-            { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#00d4ff' }},
             { selector: 'node[type="friction"]', style: { 'width': 30, 'height': 30, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top' }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }}
         ]
@@ -107,10 +103,8 @@
         const modal = document.getElementById('prompt-modal');
         modal.style.display = 'block';
         document.getElementById('modal-title').innerText = title;
-        const input = document.getElementById('modal-input');
-        input.value = '';
         document.getElementById('modal-confirm').onclick = () => {
-            callback(input.value);
+            callback(document.getElementById('modal-input').value);
             closeAllModals();
         };
     }
@@ -135,25 +129,16 @@
         }
     });
 
-    // Connector Functionality
-    cy.on('dblclick', 'edge', function(evt){
-        activeEdge = evt.target;
-        showCustomPrompt("Rename Action", "New action label...", (val) => {
-            if (val) activeEdge.data('action', val);
-        });
-    });
-
     cy.on('tap', 'edge', function(evt){
         activeEdge = evt.target;
         document.querySelector('.overlay').style.display = 'block';
-        document.getElementById('edge-menu-modal').style.display = 'block';
+        document.getElementById('connector-modal').style.display = 'block';
     });
 
-    function handleEdgeChoice(choice) {
+    function handleConnectorChoice(choice) {
         const edge = activeEdge;
         const midX = (edge.source().position('x') + edge.target().position('x')) / 2;
         const midY = (edge.source().position('y') + edge.target().position('y')) / 2;
-        
         if (choice === 'N') {
             const midId = 'n' + Date.now();
             cy.add({ group: 'nodes', data: { id: midId, label: "Complication", score: 0, color: '#444' }, position: { x: midX, y: midY } });
@@ -167,10 +152,20 @@
         closeAllModals();
     }
 
+    function triggerRename() {
+        const edge = activeEdge;
+        showCustomPrompt("Rename Action", (val) => { if(val) edge.data('action', val); });
+    }
+
     function openWheel(key) {
         document.getElementById('wheel-modal').style.display = 'block';
         document.querySelector('.overlay').style.display = 'block';
-        document.getElementById('wheel-content').innerHTML = banks[key].map(w => `<button class="wheel-item" onclick="selectWord('${key}','${w}')">${w}</button>`).join('');
+        let html = '';
+        for (let cat in families[key]) {
+            html += `<div class="wheel-cat">${cat}</div>`;
+            families[key][cat].forEach(w => { html += `<button class="wheel-item" onclick="selectWord('${key}','${w}')">${w}</button>`; });
+        }
+        document.getElementById('wheel-content').innerHTML = html;
     }
 
     function selectWord(key, word) {
@@ -179,33 +174,29 @@
     }
 
     function openInspector(n) {
-        activeNode = n;
+        activeNode = n; const d = n.data();
         document.getElementById('inspector-popup').style.display = 'block';
         document.querySelector('.overlay').style.display = 'block';
         ['label', 'score', 'char', 'set', 'action', 'emotions', 'immersion', 'utility'].forEach(f => {
             let el = document.getElementById('p-' + f);
-            if (f === 'char' || f === 'set') el.value = (n.data(f + 'acters') || n.data(f + 'tings') || []).join(', ');
-            else el.value = n.data(f) || '';
+            if (f === 'char' || f === 'set') el.value = (d[f + 'acters'] || d[f + 'tings'] || []).join(', ');
+            else el.value = d[f] || '';
         });
     }
 
     function saveAndClose() {
-        if (!activeNode) return;
-        const score = document.getElementById('p-score').value;
-        const chars = document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s);
-        const sets = document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s);
-        activeNode.data({
-            label: document.getElementById('p-label').value, score: score,
-            characters: chars, settings: sets,
-            action: document.getElementById('p-action').value,
-            emotions: document.getElementById('p-emotions').value,
-            immersion: document.getElementById('p-immersion').value,
-            utility: document.getElementById('p-utility').value,
-            color: nPos(score)
-        });
-        activeNode.position('y', (window.innerHeight/2) - (score * Y_SCALE));
-        chars.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { hybrid1: '', hybrid2: '', desc: '' }; });
-        sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { hybrid1: '', hybrid2: '', desc: '' }; });
+        const d = {
+            label: document.getElementById('p-label').value, score: document.getElementById('p-score').value,
+            characters: document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s),
+            settings: document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s),
+            action: document.getElementById('p-action').value, emotions: document.getElementById('p-emotions').value,
+            immersion: document.getElementById('p-immersion').value, utility: document.getElementById('p-utility').value,
+            color: nPos(document.getElementById('p-score').value)
+        };
+        activeNode.data(d);
+        activeNode.position('y', (window.innerHeight/2) - (d.score * Y_SCALE));
+        d.characters.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { hybrid1: '', hybrid2: '', desc: '' }; });
+        d.settings.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { hybrid1: '', hybrid2: '', desc: '' }; });
         refreshRegistry();
         closeAllModals();
     }
@@ -216,30 +207,22 @@
             html += `<h4 style="color:#00d4ff">${type.toUpperCase()}</h4>`;
             for (let name in registry[type]) {
                 const item = registry[type][name];
-                html += `<div class="registry-item">
-                    <strong>${name}</strong>
+                html += `<div class="registry-item"><strong>${name}</strong>
                     <div style="display:flex; gap:5px; margin:5px 0;">
                         <input placeholder="Hybrid A" value="${item.hybrid1}" onchange="registry.${type}['${name}'].hybrid1=this.value; refreshRegistry()">
                         <input placeholder="Hybrid B" value="${item.hybrid2}" onchange="registry.${type}['${name}'].hybrid2=this.value; refreshRegistry()">
                     </div>
-                    <textarea placeholder="Descriptor..." onchange="registry.${type}['${name}'].desc=this.value">${item.desc || ''}</textarea>
+                    <textarea placeholder="Descriptor..." onchange="registry.${type}['${name}'].desc=this.value">${item.desc}</textarea>
                 </div>`;
             }
         });
         document.getElementById('registry-content').innerHTML = html;
     }
 
-    function closeAllModals() {
-        document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none');
-        document.querySelector('.overlay').style.display = 'none';
-        activeNode = null; activeEdge = null;
-        if(sourceNode) sourceNode.unselect(); sourceNode = null;
-    }
-
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
-    function autoZoom() { cy.fit(cy.elements(), 50); }
-    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v25.json"; a.click(); }
-    function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); autoZoom(); }; r.readAsText(e.target.files[0]); }
+    function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; if(sourceNode) sourceNode.unselect(); sourceNode = null; }
+    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v26.json"; a.click(); }
+    function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
 </body>
 </html>
