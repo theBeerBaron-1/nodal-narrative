@@ -1,29 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v12</title>
+    <title>Narrative Systems Engine v13</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
         #main-wrapper { display: flex; flex-grow: 1; flex-direction: column; position: relative; }
         #cy { flex-grow: 1; background: #0f0f0f; }
-        
         #registry-panel { width: 380px; background: #151515; border-left: 1px solid #333; padding: 20px; overflow-y: auto; }
         .registry-section { margin-bottom: 20px; }
-        .registry-header { color: #00d4ff; border-bottom: 1px solid #333; cursor: pointer; display: flex; justify-content: space-between; padding: 5px 0; }
+        .registry-header { color: #00d4ff; border-bottom: 1px solid #333; cursor: pointer; display: flex; justify-content: space-between; padding: 5px 0; font-weight: bold; }
         .registry-item { background: #222; padding: 12px; border-radius: 6px; margin-top: 10px; border-left: 4px solid #00d4ff; }
-        
-        #inspector-popup { 
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 800px; background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px;
-            padding: 25px; display: none; z-index: 1001; box-shadow: 0 0 60px rgba(0,0,0,1);
-        }
+        #inspector-popup { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 800px; background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 1001; box-shadow: 0 0 60px rgba(0,0,0,1); }
         .pop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
-        
         .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 12px; border-radius: 8px; border: 1px solid #333; }
         input, textarea { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; font-family: inherit; }
         label { font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 12px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
+        .help-text { font-size: 10px; color: #666; margin-top: 8px; line-height: 1.2; }
     </style>
 </head>
 <body>
@@ -36,8 +30,11 @@
         <button onclick="exportAll()">Export JSON</button>
         <button onclick="document.getElementById('importFile').click()">Import JSON</button>
         <input type="file" id="importFile" style="display:none" onchange="importAll(event)">
-        <br>
-        <input type="text" style="width:200px; margin-top:10px;" placeholder="Search..." oninput="globalSearch(this.value)">
+        <div class="help-text">
+            • <b>Connect:</b> Click Source then Target<br>
+            • <b>Edit Action:</b> Double-click Line<br>
+            • <b>Split Action:</b> Click Line once
+        </div>
     </div>
     <div id="cy"></div>
 
@@ -55,7 +52,7 @@
                 </div>
             </div>
             <div>
-                <label>Action</label><input id="p-action" oninput="updateActiveNode(false)">
+                <label>Main Action</label><input id="p-action" oninput="updateActiveNode(false)">
                 <label>Obstacle</label><input id="p-obstacle" oninput="updateActiveNode(false)">
                 <label>Utility</label><textarea id="p-utility" rows="4" oninput="updateActiveNode(false)"></textarea>
             </div>
@@ -78,6 +75,7 @@
         container: document.getElementById('cy'),
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 75, 'height': 75, 'font-size': '10px', 'text-wrap': 'wrap', 'text-max-width': '60px' }},
+            { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#00d4ff' }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }}
         ]
     });
@@ -87,17 +85,57 @@
         cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444', characters: [], settings: [] }, position: { x: 100, y: window.innerHeight/2 } });
     }
 
+    // Interaction Logic for Nodes
     cy.on('tap', 'node', function(evt){
         let n = evt.target;
-        if (!sourceNode) { sourceNode = n; n.select(); } 
-        else {
-            if (sourceNode.id() === n.id()) { openInspector(n); } 
-            else {
-                let act = prompt("Connection Label:");
-                if (act) cy.add({ group: 'edges', data: { source: sourceNode.id(), target: n.id(), action: act } });
+        if (!sourceNode) {
+            sourceNode = n;
+            n.select();
+        } else {
+            if (sourceNode.id() === n.id()) {
+                openInspector(n);
+                sourceNode.unselect();
+                sourceNode = null;
+            } else {
+                let act = prompt("Action Label (Connection):");
+                if (act !== null) {
+                    cy.add({ group: 'edges', data: { id: 'e'+Date.now(), source: sourceNode.id(), target: n.id(), action: act } });
+                }
+                sourceNode.unselect();
+                sourceNode = null;
             }
-            sourceNode.unselect(); sourceNode = null;
         }
+    });
+
+    // Interaction Logic for Connectors (Edges)
+    cy.on('dblclick', 'edge', function(evt){
+        let edge = evt.target;
+        let newLabel = prompt("Update Action Label:", edge.data('action'));
+        if (newLabel !== null) edge.data('action', newLabel);
+    });
+
+    cy.on('tap', 'edge', function(evt){
+        let edge = evt.target;
+        // Small delay to ensure it's not the start of a double click
+        setTimeout(() => {
+            if (confirm("Insert a new node into this action?")) {
+                const midId = 'n' + Date.now();
+                const originalAction = edge.data('action');
+                cy.add({
+                    group: 'nodes',
+                    data: { id: midId, label: "Intermediate Scene", score: 0, color: '#444' },
+                    position: { 
+                        x: (edge.source().position('x') + edge.target().position('x')) / 2,
+                        y: (edge.source().position('y') + edge.target().position('y')) / 2
+                    }
+                });
+                cy.add([
+                    { group: 'edges', data: { source: edge.source().id(), target: midId, action: "leads to" } },
+                    { group: 'edges', data: { source: midId, target: edge.target().id(), action: originalAction } }
+                ]);
+                cy.remove(edge);
+            }
+        }, 250);
     });
 
     function openInspector(node) {
@@ -136,20 +174,8 @@
         if (updateRegistry) {
             chars.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { desc: '', link: '' }; });
             sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { desc: '', link: '' }; });
-            pruneRegistry();
             updateRegistryPanel();
         }
-    }
-
-    function pruneRegistry() {
-        const activeChars = new Set();
-        const activeSets = new Set();
-        cy.nodes().forEach(n => {
-            (n.data('characters') || []).forEach(c => activeChars.add(c));
-            (n.data('settings') || []).forEach(s => activeSets.add(s));
-        });
-        Object.keys(registry.characters).forEach(k => { if(!activeChars.has(k)) delete registry.characters[k]; });
-        Object.keys(registry.settings).forEach(k => { if(!activeSets.has(k)) delete registry.settings[k]; });
     }
 
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
@@ -165,22 +191,13 @@
             for (let name in registry[type]) {
                 html += `<div class="registry-item">
                     <strong>${name}</strong>
-                    <textarea placeholder="Description..." onchange="registry.${type}['${name}'].desc=this.value">${registry[type][name].desc}</textarea>
-                    <input placeholder="Link" value="${registry[type][name].link}" onchange="registry.${type}['${name}'].link=this.value">
+                    <textarea placeholder="Description..." onchange="registry.${type}['${name}'].desc=this.value">${registry[type][name].desc || ''}</textarea>
+                    <input placeholder="Link" value="${registry[type][name].link || ''}" onchange="registry.${type}['${name}'].link=this.value">
                 </div>`;
             }
             html += `</div></div>`;
         });
         document.getElementById('registry-content').innerHTML = html;
-    }
-
-    function globalSearch(term) {
-        cy.elements().style('opacity', term ? 0.1 : 1);
-        if(!term) return;
-        cy.nodes().filter(n => {
-            const d = n.data();
-            return d.label.toLowerCase().includes(term.toLowerCase()) || (d.characters || []).some(c => c.toLowerCase().includes(term.toLowerCase()));
-        }).style('opacity', 1).connectedEdges().style('opacity', 0.8);
     }
 
     function closeInspector() { 
@@ -194,7 +211,7 @@
         const bundle = { graph: cy.elements().jsons(), registry: registry };
         const a = document.createElement("a");
         a.href = URL.createObjectURL(new Blob([JSON.stringify(bundle)], { type: "application/json" }));
-        a.download = "polymath-narrative-v12.json";
+        a.download = "polymath-narrative-v13.json";
         a.click();
     }
 
