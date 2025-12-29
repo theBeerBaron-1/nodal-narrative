@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v35</title>
+    <title>Narrative Systems Engine v36</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
         #main-wrapper { display: flex; flex-grow: 1; flex-direction: column; position: relative; }
         #cy { flex-grow: 1; background: #0f0f0f; }
         #registry-panel { width: 420px; background: #151515; border-left: 1px solid #333; padding: 20px; overflow-y: auto; }
-        .registry-item { background: #222; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #00d4ff; cursor: pointer; }
+        .registry-item { background: #222; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #00d4ff; cursor: pointer; transition: 0.2s; }
         .registry-item.active-lens { border-left-color: #fff; background: #005f73; box-shadow: 0 0 15px #00d4ff; }
         
         .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 3000; box-shadow: 0 0 60px #000; width: 450px; }
@@ -100,11 +100,11 @@
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'text-wrap': 'wrap' }},
             { selector: 'node[type="friction"]', style: { 'width': 30, 'height': 30, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top', 'z-index': 999 }},
-            { selector: 'node[type="midpoint"]', style: { 'width': 8, 'height': 8, 'background-color': '#00d4ff', 'shape': 'ellipse', 'label': '' }},
+            { selector: 'node[type="midpoint"]', style: { 'width': 1, 'height': 1, 'background-color': '#00d4ff', 'opacity': 0, 'label': '' }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }},
             { selector: 'edge[type="needle"]', style: { 'width': 2, 'line-color': '#ff4500', 'line-style': 'dashed', 'target-arrow-shape': 'none' }},
-            { selector: '.ghost', style: { 'opacity': 0.05, 'text-opacity': 0 }},
-            { selector: '.lens-highlight', style: { 'border-width': 6, 'border-color': '#00d4ff', 'line-color': '#00d4ff', 'width': 6 }}
+            { selector: '.ghost', style: { 'opacity': 0.02, 'text-opacity': 0 }},
+            { selector: '.lens-highlight', style: { 'border-width': 8, 'border-color': '#00d4ff', 'line-color': '#00d4ff', 'width': 8, 'opacity': 1, 'text-opacity': 1 }}
         ]
     });
 
@@ -144,7 +144,7 @@
         if (n.data('type') === 'friction' || n.data('type') === 'midpoint') return;
         if (!sourceNode) { 
             sourceNode = n; 
-            n.style({'border-width': 4, 'border-color': '#fff'});
+            n.style({'border-width': 6, 'border-color': '#fff'});
         } else {
             if (sourceNode.id() === n.id()) { openInspector(n); } 
             else {
@@ -173,29 +173,20 @@
         const midY = (sPos.y + tPos.y) / 2;
 
         if (choice === 'F') {
-            showCustomPrompt("Friction Label", "e.g. Resistance", (fLab) => {
-                const midNodeId = 'mid' + Date.now();
+            showCustomPrompt("Friction Label", "e.g. Conflict", (fLab) => {
+                const midId = 'mid' + Date.now();
                 const pinId = 'f' + Date.now();
-                
-                // 1. Create a tiny actual node as the anchor
-                cy.add({ group: 'nodes', data: { id: midNodeId, type: 'midpoint' }, position: { x: midX, y: midY } });
-                
-                // 2. Simple perpendicular offset calculation
                 const dx = tPos.x - sPos.x;
                 const dy = tPos.y - sPos.y;
                 const len = Math.sqrt(dx*dx + dy*dy) || 1;
                 const nx = -dy / len;
                 const ny = dx / len;
-                
-                // 3. Add the diamond friction node
-                cy.add({ 
-                    group: 'nodes', 
-                    data: { id: pinId, type: "friction", label: fLab || "PIN" }, 
-                    position: { x: midX + (nx * 60), y: midY + (ny * 60) } 
-                });
-                
-                // 4. Draw the visible needle connection
-                cy.add({ group: 'edges', data: { source: midNodeId, target: pinId, type: 'needle' } });
+
+                cy.add([
+                    { group: 'nodes', data: { id: midId, type: 'midpoint' }, position: { x: midX, y: midY } },
+                    { group: 'nodes', data: { id: pinId, type: "friction", label: fLab || "PIN" }, position: { x: midX + (nx * 65), y: midY + (ny * 65) } },
+                    { group: 'edges', data: { id: 'e'+pinId, source: midId, target: pinId, type: 'needle' } }
+                ]);
             });
         } else if (choice === 'N') {
             const midId = 'n' + Date.now();
@@ -224,9 +215,11 @@
 
     function saveAndClose() {
         if (!activeNode) return;
+        const d = activeNode.data();
         const score = document.getElementById('p-score').value;
         const chars = document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s);
         const sets = document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s);
+        
         activeNode.data({
             label: document.getElementById('p-label').value, score: score,
             characters: chars, settings: sets,
@@ -263,9 +256,8 @@
     function clearHighlights() {
         lensMode = { type: null, name: null };
         cy.elements().removeClass('ghost').removeClass('lens-highlight');
-        cy.nodes().style({'width': 80, 'height': 80, 'opacity': 1, 'border-width': 0});
+        cy.nodes().style({'width': 80, 'height': 80, 'border-width': 0, 'opacity': 1, 'text-opacity': 1});
         cy.nodes('[type="friction"]').style({'width': 30, 'height': 30});
-        cy.nodes('[type="midpoint"]').style({'width': 8, 'height': 8});
         cy.edges().style({'line-color': '#333', 'width': 4, 'opacity': 1});
         refreshRegistry();
     }
@@ -291,7 +283,7 @@
 
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
     function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; }
-    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v35.json"; a.click(); }
+    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v36.json"; a.click(); }
     function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
 </body>
