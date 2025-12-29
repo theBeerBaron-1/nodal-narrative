@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v44</title>
+    <title>Narrative Systems Engine v43</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -11,16 +11,14 @@
         .registry-item { background: #222; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #00d4ff; cursor: pointer; transition: 0.2s; }
         .registry-item.active-lens { border-left-color: #fff; background: #005f73; box-shadow: 0 0 15px #00d4ff; }
         .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 3000; box-shadow: 0 0 60px #000; width: 450px; }
-        #inspector-popup { width: 450px; z-index: 2000; } /* Narrowed for the single column style */
+        #inspector-popup { width: 500px; z-index: 2000; max-height: 90vh; overflow-y: auto; }
         .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 10px; border-radius: 8px; border: 1px solid #333; }
         button { cursor: pointer; padding: 6px 12px; margin: 2px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 11px; }
         input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; font-family: inherit; }
         label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 12px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
-        
-        /* New Precision Menu Styles */
-        .lexical-field-row { display: flex; align-items: flex-end; gap: 8px; }
-        .icon-trigger { cursor: pointer; background: #333; border: 1px solid #555; border-radius: 4px; padding: 8px; font-size: 14px; transition: 0.2s; display: flex; align-items: center; justify-content: center; min-width: 35px; }
+        .aeiou-row { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 2px; }
+        .icon-trigger { cursor: pointer; background: #333; border: 1px solid #555; border-radius: 4px; padding: 8px; font-size: 14px; transition: 0.2s; display: flex; align-items: center; justify-content: center; min-width: 38px; height: 35px; }
         .icon-trigger:hover { background: #00d4ff; color: #000; }
         #precision-menu { position: absolute; background: #1a1a1a; border: 1px solid #00d4ff; border-radius: 4px; z-index: 4000; display: none; max-height: 300px; overflow-y: auto; width: 180px; box-shadow: 0 5px 20px #000; }
         .menu-item { padding: 8px 12px; cursor: pointer; font-size: 12px; border-bottom: 1px solid #333; }
@@ -31,7 +29,6 @@
 <body>
 
 <div class="overlay" onclick="closeAllModals()"></div>
-
 <div id="precision-menu"></div>
 
 <div id="connector-modal" class="custom-modal">
@@ -62,18 +59,25 @@
     <div id="cy"></div>
 
     <div id="inspector-popup" class="custom-modal">
-        <h3 style="margin: 0 0 15px 0; color: #00d4ff;">SCENE FOCUS</h3>
+        <h3 style="margin: 0 0 15px 0; color: #00d4ff;">SCENE FOCUS (AEIOU)</h3>
+        
         <label>Scene Label</label><input id="p-label">
         <label>Emotional Score (-10 to 10)</label><input type="number" id="p-score">
-        
-        <label>Descriptor Value (Action / Emotion / Sensory)</label>
-        <div class="lexical-field-row">
-            <input id="p-master-val" placeholder="Select or type details...">
-            <div class="icon-trigger" title="Action" onclick="openPrecision(event, 'action')">⚡</div>
-            <div class="icon-trigger" title="Emotion" onclick="openPrecision(event, 'emotions')">🎭</div>
-            <div class="icon-trigger" title="Immersion" onclick="openPrecision(event, 'immersion')">🌊</div>
-            <div class="icon-trigger" title="Utility" onclick="openPrecision(event, 'utility')">🛠</div>
-        </div>
+
+        <label>Action (A)</label>
+        <div class="aeiou-row"><input id="f-action"><div class="icon-trigger" onclick="openPrecision(event, 'action', 'f-action')">⚡</div></div>
+
+        <label>Emotion (E)</label>
+        <div class="aeiou-row"><input id="f-emotions"><div class="icon-trigger" onclick="openPrecision(event, 'emotions', 'f-emotions')">🎭</div></div>
+
+        <label>Immersion (I)</label>
+        <div class="aeiou-row"><input id="f-immersion"><div class="icon-trigger" onclick="openPrecision(event, 'immersion', 'f-immersion')">🌊</div></div>
+
+        <label>Obstacle (O)</label>
+        <div class="aeiou-row"><input id="f-obstacle"><div class="icon-trigger" onclick="openPrecision(event, 'obstacle', 'f-obstacle')">🧱</div></div>
+
+        <label>Utility (U)</label>
+        <div class="aeiou-row"><input id="f-utility"><div class="icon-trigger" onclick="openPrecision(event, 'utility', 'f-utility')">🛠</div></div>
 
         <label>Characters</label><input id="p-char">
         <label>Settings</label><input id="p-set">
@@ -88,28 +92,15 @@
     let activeNode = null, sourceNode = null, activeEdge = null, registry = { characters: {}, settings: {} };
     let highlightedNodes = [];
     let lensMode = { type: null, name: null };
+    let currentTargetFieldId = null;
     const Y_SCALE = 60;
 
     const banks = {
-        action: { 
-            "Direct": ["Confronts", "Attacks", "Demands"], 
-            "Indirect": ["Deceives", "Persuades", "Subverts"], 
-            "Defensive": ["Resists", "Withholds", "Protects"] 
-        },
-        emotions: { 
-            "Positive": ["Hopeful", "Joyful", "Relieved"], 
-            "Negative": ["Fearful", "Angry", "Dreadful"], 
-            "Conflict": ["Doubtful", "Shameful", "Confused"] 
-        },
-        immersion: { 
-            "Physical": ["Harsh", "Dirty", "Cold"], 
-            "Atmospheric": ["Bright", "Shadowy", "Luminous"], 
-            "Sensory": ["Stink", "Fragrant", "Sharp"] 
-        },
-        utility: { 
-            "Structural": ["Inciting Incident", "Midpoint Pivot", "Resolution"], 
-            "Developmental": ["Character Intro", "Thematic Setup", "World Building"] 
-        }
+        action: { "Direct": ["Confronts", "Attacks", "Demands"], "Indirect": ["Deceives", "Persuades", "Subverts"], "Defensive": ["Resists", "Withholds", "Protects"] },
+        emotions: { "Positive": ["Hopeful", "Joyful", "Relieved"], "Negative": ["Fearful", "Angry", "Dreadful"], "Conflict": ["Doubtful", "Shameful", "Confused"] },
+        immersion: { "Physical": ["Harsh", "Dirty", "Cold"], "Atmospheric": ["Bright", "Shadowy", "Luminous"], "Sensory": ["Stink", "Fragrant", "Sharp"] },
+        obstacle: { "Internal": ["Doubt", "Trauma", "Morality"], "External": ["Antagonist", "Environment", "Time"], "Systemic": ["Law", "Hierarchy", "Tradition"] },
+        utility: { "Structural": ["Inciting Incident", "Midpoint Pivot", "Resolution"], "Developmental": ["Character Intro", "Thematic Setup", "World Building"] }
     };
 
     var cy = cytoscape({
@@ -128,39 +119,33 @@
         ]
     });
 
-    function openPrecision(event, bankKey) {
+    function openPrecision(event, bankKey, targetId) {
+        currentTargetFieldId = targetId;
         const menu = document.getElementById('precision-menu');
         const trigger = event.currentTarget;
         const rect = trigger.getBoundingClientRect();
-        
         menu.style.display = 'block';
         menu.style.top = (rect.bottom + window.scrollY) + 'px';
         menu.style.left = rect.left + 'px';
-        
         renderCategories(bankKey);
     }
 
     function renderCategories(bankKey) {
         const menu = document.getElementById('precision-menu');
         let html = `<div class="menu-header">${bankKey}</div>`;
-        Object.keys(banks[bankKey]).forEach(cat => {
-            html += `<div class="menu-item" onclick="renderSpecifics('${bankKey}', '${cat}')">${cat} ➔</div>`;
-        });
+        Object.keys(banks[bankKey]).forEach(cat => { html += `<div class="menu-item" onclick="renderSpecifics('${bankKey}', '${cat}')">${cat} ➔</div>`; });
         menu.innerHTML = html;
     }
 
     function renderSpecifics(bankKey, category) {
         const menu = document.getElementById('precision-menu');
-        let html = `<div class="menu-header">${category}</div>`;
-        html += `<div class="menu-item" style="color:#888" onclick="renderCategories('${bankKey}')">⬅ Back</div>`;
-        banks[bankKey][category].forEach(word => {
-            html += `<div class="menu-item" onclick="selectWord('${word}')">${word}</div>`;
-        });
+        let html = `<div class="menu-header">${category}</div><div class="menu-item" style="color:#888" onclick="renderCategories('${bankKey}')">⬅ Back</div>`;
+        banks[bankKey][category].forEach(word => { html += `<div class="menu-item" onclick="selectWord('${word}')">${word}</div>`; });
         menu.innerHTML = html;
     }
 
     function selectWord(word) {
-        const input = document.getElementById('p-master-val');
+        const input = document.getElementById(currentTargetFieldId);
         input.value = input.value ? input.value + ", " + word : word;
         document.getElementById('precision-menu').style.display = 'none';
     }
@@ -188,9 +173,7 @@
             if (sourceNode.id() === n.id()) { openInspector(n); } 
             else {
                 const s = sourceNode;
-                showCustomPrompt("Connection Label", "Action...", (val) => {
-                    if (val) cy.add({ group: 'edges', data: { source: s.id(), target: n.id(), action: val } });
-                });
+                showCustomPrompt("Connection Label", "Action...", (val) => { if (val) cy.add({ group: 'edges', data: { source: s.id(), target: n.id(), action: val } }); });
             }
             resetHighlights(); sourceNode = null;
         }
@@ -226,7 +209,7 @@
         document.querySelector('.overlay').style.display = 'block';
         document.getElementById('p-label').value = d.label || '';
         document.getElementById('p-score').value = d.score || 0;
-        document.getElementById('p-master-val').value = d.masterVal || '';
+        ['action', 'emotions', 'immersion', 'obstacle', 'utility'].forEach(k => { document.getElementById('f-' + k).value = d[k] || ''; });
         document.getElementById('p-char').value = (d.characters || []).join(', ');
         document.getElementById('p-set').value = (d.settings || []).join(', ');
     }
@@ -236,35 +219,24 @@
         const score = document.getElementById('p-score').value;
         const chars = document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s);
         const sets = document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s);
-        activeNode.data({ 
-            label: document.getElementById('p-label').value, score: score, characters: chars, settings: sets, 
-            masterVal: document.getElementById('p-master-val').value, color: nPos(score) 
-        });
+        let updateData = { label: document.getElementById('p-label').value, score: score, characters: chars, settings: sets, color: nPos(score) };
+        ['action', 'emotions', 'immersion', 'obstacle', 'utility'].forEach(k => { updateData[k] = document.getElementById('f-' + k).value; });
+        activeNode.data(updateData);
         activeNode.position('y', (window.innerHeight/2) - (score * Y_SCALE));
         chars.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { h1: '', h2: '', desc: '' }; });
         sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { h1: '', h2: '', desc: '' }; });
         refreshRegistry(); closeAllModals();
     }
 
-    function highlightNode(node) {
-        node.scratch('origStyle', { 'border-width': node.style('border-width'), 'border-color': node.style('border-color'), 'width': node.style('width'), 'height': node.style('height') });
-        node.style({ 'border-width': 6, 'border-color': '#00d4ff', 'width': parseFloat(node.style('width')) * 1.2, 'height': parseFloat(node.style('height')) * 1.2 });
-        highlightedNodes.push(node);
+    function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
+    function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; document.getElementById('precision-menu').style.display = 'none'; activeNode = null; activeEdge = null; sourceNode = null; }
+    function highlightNode(node) { node.scratch('origStyle', { 'border-width': 0, 'width': 80, 'height': 80 }); node.style({ 'border-width': 6, 'border-color': '#00d4ff' }); highlightedNodes.push(node); }
+    function resetHighlights() { highlightedNodes.forEach(n => n.style(n.scratch('origStyle'))); highlightedNodes = []; }
+    function showCustomPrompt(title, placeholder, callback) {
+        document.querySelector('.overlay').style.display = 'block'; document.getElementById('prompt-modal').style.display = 'block';
+        document.getElementById('modal-title').innerText = title; const input = document.getElementById('modal-input');
+        input.value = ''; input.placeholder = placeholder; document.getElementById('modal-confirm').onclick = () => { callback(input.value); closeAllModals(); };
     }
-
-    function resetHighlights() {
-        highlightedNodes.forEach(n => { const orig = n.scratch('origStyle'); if (orig) n.style(orig); });
-        highlightedNodes = [];
-    }
-
-    function triggerRename() { showCustomPrompt("Rename Action", "Label...", (val) => { if(val) activeEdge.data('action', val); }); }
-    function closeAllModals() { 
-        document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); 
-        document.querySelector('.overlay').style.display = 'none'; 
-        document.getElementById('precision-menu').style.display = 'none';
-        activeNode = null; activeEdge = null; sourceNode = null; 
-    }
-
     function refreshRegistry() {
         let html = '';
         ['characters', 'settings'].forEach(type => {
@@ -276,7 +248,6 @@
         });
         document.getElementById('registry-content').innerHTML = html;
     }
-
     function applyLens(type, name) {
         lensMode = { type: type, name: name }; const dataKey = type === 'characters' ? 'characters' : 'settings'; const targetName = name.trim().toLowerCase();
         cy.elements().removeClass('lens-highlight').addClass('ghost');
@@ -284,23 +255,13 @@
         matches.removeClass('ghost').addClass('lens-highlight');
         refreshRegistry();
     }
-
     function clearHighlights() {
         lensMode = { type: null, name: null }; cy.elements().removeClass('ghost').removeClass('lens-highlight');
         cy.nodes().forEach(n => { n.style({ 'width': 80, 'height': 80, 'shape': 'ellipse', 'opacity': 1, 'border-width': 0 }); });
         cy.edges().forEach(e => { e.style({ 'line-color': '#333', 'width': 3, 'opacity': 1 }); });
         refreshRegistry();
     }
-
-    function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
-    function showCustomPrompt(title, placeholder, callback) {
-        document.querySelector('.overlay').style.display = 'block';
-        document.getElementById('prompt-modal').style.display = 'block';
-        document.getElementById('modal-title').innerText = title;
-        const input = document.getElementById('modal-input');
-        input.value = ''; input.placeholder = placeholder;
-        document.getElementById('modal-confirm').onclick = () => { callback(input.value); closeAllModals(); };
-    }
+    function triggerRename() { showCustomPrompt("Rename Action", "Label...", (val) => { if(val) activeEdge.data('action', val); }); }
     function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v43.json"; a.click(); }
     function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
