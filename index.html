@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v44</title>
+    <title>Narrative Systems Engine v43</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -18,6 +18,7 @@
         input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; font-family: inherit; }
         label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 12px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
+        .lexical-row { display: flex; gap: 5px; align-items: center; }
     </style>
 </head>
 <body>
@@ -28,7 +29,7 @@
     <h3 style="color:#00d4ff; margin:0 0 15px 0;">Connector Action</h3>
     <button onclick="triggerRename()" style="width:100%; padding:12px; margin-bottom:8px;">✎ Rename Label</button>
     <button onclick="handleConnectorChoice('N')" style="width:100%; padding:12px; margin-bottom:8px;">+ Add Complication Node</button>
-    <button onclick="handleConnectorChoice('F')" style="width:100%; padding:12px;">+ Add T-Junction Friction</button>
+    <button onclick="handleConnectorChoice('F')" style="width:100%; padding:12px;">+ Add Friction Node</button>
 </div>
 
 <div id="prompt-modal" class="custom-modal">
@@ -52,22 +53,42 @@
     <div id="cy"></div>
 
     <div id="inspector-popup" class="custom-modal">
-        <h3 style="margin: 0 0 15px 0; color: #00d4ff;">NODE FOCUS</h3>
+        <h3 style="margin: 0 0 15px 0; color: #00d4ff;">SCENE FOCUS</h3>
         <div class="pop-grid">
             <div>
-                <label>Label</label><input id="p-label">
+                <label>Scene Label</label><input id="p-label">
                 <label>Emotional Score (-10 to 10)</label><input type="number" id="p-score">
                 <label>Characters</label><input id="p-char">
                 <label>Settings</label><input id="p-set">
             </div>
             <div>
-                <label>Action</label><input id="p-action">
-                <label>Emotions</label><input id="p-emotions">
-                <label>Immersion</label><input id="p-immersion">
-                <label>Utility</label><input id="p-utility">
+                <label>Action Family</label>
+                <div class="lexical-row">
+                    <select id="p-action-cat" onchange="updateSubList('action', this.value)"></select>
+                    <select id="p-action-word" onchange="document.getElementById('p-action-val').value=this.value"></select>
+                </div>
+                <input id="p-action-val">
+                <label>Emotions Family</label>
+                <div class="lexical-row">
+                    <select id="p-emotions-cat" onchange="updateSubList('emotions', this.value)"></select>
+                    <select id="p-emotions-word" onchange="document.getElementById('p-emotions-val').value=this.value"></select>
+                </div>
+                <input id="p-emotions-val">
+                <label>Immersion</label>
+                <div class="lexical-row">
+                    <select id="p-immersion-cat" onchange="updateSubList('immersion', this.value)"></select>
+                    <select id="p-immersion-word" onchange="document.getElementById('p-immersion-val').value=this.value"></select>
+                </div>
+                <input id="p-immersion-val">
+                <label>Utility</label>
+                <div class="lexical-row">
+                    <select id="p-utility-cat" onchange="updateSubList('utility', this.value)"></select>
+                    <select id="p-utility-word" onchange="document.getElementById('p-utility-val').value=this.value"></select>
+                </div>
+                <input id="p-utility-val">
             </div>
         </div>
-        <button style="margin-top: 25px; width:100%; padding:12px; background:#005f73; border:none; color:white; font-weight:bold;" onclick="saveAndClose()">Save & Exit</button>
+        <button style="margin-top: 25px; width: 100%; padding: 12px; background: #005f73; border:none; color:white; font-weight:bold;" onclick="saveAndClose()">Save & Exit</button>
     </div>
 </div>
 
@@ -79,14 +100,19 @@
     let lensMode = { type: null, name: null };
     const Y_SCALE = 60;
 
+    const banks = {
+        action: { "Conflict": ["Confronts", "Attacks", "Sabotages"], "Subterfuge": ["Betrays", "Deceives", "Infiltrates"], "Social": ["Negotiates", "Confesses", "Persuades"] },
+        emotions: { "High": ["Euphoria", "Terror", "Rage"], "Low": ["Melancholy", "Dread", "Despair"], "Internal": ["Nostalgia", "Hope", "Shame"] },
+        utility: { "Structural": ["Inciting Incident", "Midpoint Pivot", "Resolution"], "Developmental": ["Character Intro", "Thematic Setup", "World Building"] },
+        immersion: { "Sensory": ["Sulphurous", "Rot-sweet", "Iron-tanged"], "Visual": ["Neon-soaked", "Bleached", "Luminous"] }
+    };
+
     var cy = cytoscape({
         container: document.getElementById('cy'),
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'shape': 'ellipse', 'text-wrap': 'wrap' }},
-            { selector: 'node[type="friction"]', style: { 'width': 35, 'height': 35, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top', 'z-index': 10 }},
-            { selector: 'node[type="anchor"]', style: { 'width': 6, 'height': 6, 'background-color': '#00d4ff', 'shape': 'ellipse', 'label': '' }},
+            { selector: 'node[type="friction"]', style: { 'width': 35, 'height': 35, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top' }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }},
-            { selector: 'edge[type="needle"]', style: { 'width': 2, 'line-color': '#ff4500', 'line-style': 'dashed', 'target-arrow-shape': 'none', 'curve-style': 'haystack' }},
             { selector: '.ghost', style: { 'opacity': 0.01, 'text-opacity': 0 }},
             { selector: '.lens-highlight', style: { 'border-width': 8, 'border-color': '#00d4ff', 'line-color': '#00d4ff', 'width': 8, 'opacity': 1, 'text-opacity': 1 }}
         ]
@@ -105,6 +131,27 @@
         cy.fit(null, 50);
     };
 
+    function populateCategories() {
+        ['action', 'emotions', 'utility', 'immersion'].forEach(key => {
+            const catSelect = document.getElementById(`p-${key}-cat`);
+            catSelect.innerHTML = '<option value="">Family...</option>';
+            Object.keys(banks[key]).forEach(cat => {
+                let opt = document.createElement('option');
+                opt.value = cat; opt.innerText = cat; catSelect.appendChild(opt);
+            });
+        });
+    }
+
+    function updateSubList(key, category) {
+        const wordSelect = document.getElementById(`p-${key}-word`);
+        wordSelect.innerHTML = '<option value="">Word...</option>';
+        if (!category) return;
+        banks[key][category].forEach(word => {
+            let opt = document.createElement('option');
+            opt.value = word; opt.innerText = word; wordSelect.appendChild(opt);
+        });
+    }
+
     function showCustomPrompt(title, placeholder, callback) {
         document.querySelector('.overlay').style.display = 'block';
         document.getElementById('prompt-modal').style.display = 'block';
@@ -116,18 +163,17 @@
 
     function addNode() {
         const id = 'n' + Date.now();
-        cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444', characters: [], settings: [] }, position: { x: (cy.nodes().filter('[type!="friction"][type!="anchor"]').length * 220) + 100, y: window.innerHeight/2 } });
+        cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444', characters: [], settings: [] }, position: { x: (cy.nodes().filter('[type!="friction"]').length * 220) + 100, y: window.innerHeight/2 } });
     }
 
     cy.on('tap', 'node', function(evt){
         let n = evt.target;
-        if (n.data('type') === 'anchor') return;
+        if (n.data('type') === 'friction') return;
         if (!sourceNode) { 
             sourceNode = n; 
             highlightNode(n);
         } else {
             if (sourceNode.id() === n.id()) { openInspector(n); } 
-            else if (n.data('type') === 'friction') { openInspector(n); }
             else {
                 const s = sourceNode;
                 showCustomPrompt("Connection Label", "Action...", (val) => {
@@ -140,7 +186,6 @@
     });
 
     cy.on('tap', 'edge', function(evt){
-        if (evt.target.data('type') === 'needle') return;
         activeEdge = evt.target;
         document.querySelector('.overlay').style.display = 'block';
         document.getElementById('connector-modal').style.display = 'block';
@@ -153,44 +198,37 @@
         const tNode = edge.target();
         const originalAction = edge.data('action');
         const midX = (sNode.position().x + tNode.position().x) / 2;
-        const midY = (sPos = sNode.position().y + tPos = tNode.position().y) / 2;
+        const midY = (sNode.position().y + tNode.position().y) / 2;
+
+        const addIntermediateNode = (label, type = "intermediate") => {
+            const midId = type[0] + Date.now();
+            const dx = tNode.position().x - sNode.position().x;
+            const dy = tNode.position().y - sNode.position().y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            const offset = 80;
+            const perpX = (dy / length) * offset;
+            const perpY = (-dx / length) * offset;
+
+            cy.remove(edge);
+            const newNode = cy.add({
+                group: 'nodes',
+                data: { id: midId, label: label, type: type, score: 0, color: '#444', characters: [], settings: [] },
+                position: { x: midX + perpX, y: midY + perpY }
+            });
+            cy.add([
+                { group: 'edges', data: { source: sNode.id(), target: midId, action: type === "friction" ? "friction" : "leads to" } },
+                { group: 'edges', data: { source: midId, target: tNode.id(), action: originalAction } }
+            ]);
+            refreshRegistry();
+        };
 
         if (choice === 'F') {
             showCustomPrompt("Friction Label", "Conflict...", (fLab) => {
-                const anchorId = 'a' + Date.now();
-                const frictionId = 'f' + Date.now();
-                
-                const dx = tNode.position().x - sNode.position().x;
-                const dy = tNode.position().y - sNode.position().y;
-                const length = Math.sqrt(dx*dx + dy*dy);
-                const offset = 60;
-                const perpX = (dy/length) * offset;
-                const perpY = (-dx/length) * offset;
-
-                // 1. Splice the main edge with a tiny anchor node
-                cy.remove(edge);
-                cy.add({ group: 'nodes', data: { id: anchorId, type: 'anchor' }, position: { x: midX, y: midY } });
-                cy.add([
-                    { group: 'edges', data: { source: sNode.id(), target: anchorId, action: '' } },
-                    { group: 'edges', data: { source: anchorId, target: tNode.id(), action: originalAction } }
-                ]);
-
-                // 2. Add the perpendicular Friction Diamond
-                cy.add({ 
-                    group: 'nodes', 
-                    data: { id: frictionId, type: "friction", label: fLab || "PIN", characters: [], settings: [] }, 
-                    position: { x: midX + perpX, y: midY + perpY } 
-                });
-
-                // 3. Connect diamond to anchor with needle
-                cy.add({ group: 'edges', data: { source: anchorId, target: frictionId, type: 'needle' } });
+                addIntermediateNode(fLab || "PIN", "friction");
                 closeAllModals();
             });
         } else if (choice === 'N') {
-            const midId = 'n' + Date.now();
-            cy.remove(edge);
-            cy.add({ group: 'nodes', data: { id: midId, label: "Complication", score: 0, color: '#444', characters: [], settings: [] }, position: { x: midX, y: midY } });
-            cy.add([{ group: 'edges', data: { source: sNode.id(), target: midId, action: "leads to" } }, { group: 'edges', data: { source: midId, target: tNode.id(), action: originalAction } }]);
+            addIntermediateNode("Complication", "intermediate");
             closeAllModals();
         }
     }
@@ -207,36 +245,25 @@
         highlightedNodes = [];
     }
 
+    function triggerRename() { showCustomPrompt("Rename Label", "Label...", (val) => { if(val) activeEdge.data('action', val); }); }
+
     function openInspector(n) {
-        activeNode = n; const d = n.data();
+        activeNode = n; const d = n.data(); populateCategories();
         document.getElementById('inspector-popup').style.display = 'block';
         document.querySelector('.overlay').style.display = 'block';
-        ['label', 'score', 'action', 'emotions', 'immersion', 'utility'].forEach(f => {
-            document.getElementById('p-'+f).value = d[f] || (f==='score'?0:'');
-        });
+        ['label', 'score'].forEach(f => document.getElementById('p-'+f).value = d[f] || (f==='score'?0:''));
+        ['action', 'emotions', 'immersion', 'utility'].forEach(f => document.getElementById('p-'+f+'-val').value = d[f] || '');
         document.getElementById('p-char').value = (d.characters || []).join(', ');
         document.getElementById('p-set').value = (d.settings || []).join(', ');
     }
 
     function saveAndClose() {
         if (!activeNode) return;
-        const d = activeNode.data();
         const score = document.getElementById('p-score').value;
         const chars = document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s);
         const sets = document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s);
-        
-        activeNode.data({
-            label: document.getElementById('p-label').value, score: score,
-            characters: chars, settings: sets,
-            action: document.getElementById('p-action').value,
-            emotions: document.getElementById('p-emotions').value,
-            immersion: document.getElementById('p-immersion').value,
-            utility: document.getElementById('p-utility').value,
-            color: (d.type === 'friction' ? '#ff4500' : nPos(score))
-        });
-        if (d.type !== 'friction' && d.type !== 'anchor') {
-            activeNode.position('y', (window.innerHeight/2) - (score * Y_SCALE));
-        }
+        activeNode.data({ label: document.getElementById('p-label').value, score: score, characters: chars, settings: sets, action: document.getElementById('p-action-val').value, emotions: document.getElementById('p-emotions-val').value, immersion: document.getElementById('p-immersion-val').value, utility: document.getElementById('p-utility-val').value, color: nPos(score) });
+        activeNode.position('y', (window.innerHeight/2) - (score * Y_SCALE));
         chars.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { h1: '', h2: '', desc: '' }; });
         sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { h1: '', h2: '', desc: '' }; });
         refreshRegistry(); closeAllModals();
@@ -244,24 +271,17 @@
     }
 
     function applyLens(type, name) {
-        lensMode = { type: type, name: name }; const targetName = name.trim().toLowerCase();
-        const dataKey = type === 'characters' ? 'characters' : 'settings';
+        lensMode = { type: type, name: name }; const dataKey = type === 'characters' ? 'characters' : 'settings'; const targetName = name.trim().toLowerCase();
         cy.elements().removeClass('lens-highlight').addClass('ghost');
         const matches = cy.nodes().filter(n => { const list = n.data(dataKey) || []; return list.some(item => item.trim().toLowerCase() === targetName); });
         matches.removeClass('ghost').addClass('lens-highlight');
-        cy.edges().forEach(e => {
-            const sL = e.source().data(dataKey) || []; const tL = e.target().data(dataKey) || [];
-            if (sL.some(i => i.trim().toLowerCase() === targetName) && tL.some(i => i.trim().toLowerCase() === targetName)) e.removeClass('ghost').addClass('lens-highlight');
-        });
+        cy.edges().forEach(e => { const sL = e.source().data(dataKey) || []; const tL = e.target().data(dataKey) || []; if (sL.some(i => i.trim().toLowerCase() === targetName) && tL.some(i => i.trim().toLowerCase() === targetName)) e.removeClass('ghost').addClass('lens-highlight'); });
         refreshRegistry();
     }
 
     function clearHighlights() {
         lensMode = { type: null, name: null }; cy.elements().removeClass('ghost').removeClass('lens-highlight');
-        cy.nodes().forEach(n => {
-            const isF = n.data('type') === 'friction'; const isA = n.data('type') === 'anchor';
-            n.style({ 'width': isF?35:isA?6:80, 'height': isF?35:isA?6:80, 'shape': isF?'diamond':'ellipse', 'opacity': 1, 'border-width': 0 });
-        });
+        cy.nodes().forEach(n => { const isF = n.data('type') === 'friction'; n.style({ 'width': isF ? 35 : 80, 'height': isF ? 35 : 80, 'shape': isF ? 'diamond' : 'ellipse', 'opacity': 1, 'border-width': 0 }); });
         cy.edges().style({ 'line-color': '#333', 'width': 4, 'opacity': 1 }); refreshRegistry();
     }
 
@@ -277,10 +297,9 @@
         document.getElementById('registry-content').innerHTML = html;
     }
 
-    function triggerRename() { showCustomPrompt("Rename Label", "Label...", (val) => { if(val) activeEdge.data('action', val); }); }
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
     function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; sourceNode = null; }
-    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v44.json"; a.click(); }
+    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v43.json"; a.click(); }
     function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
 </body>
