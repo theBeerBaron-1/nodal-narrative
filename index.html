@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v39</title>
+    <title>Narrative Systems Engine v40</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -119,6 +119,22 @@
         ]
     });
 
+    // DEFAULT STARTUP ARC
+    window.onload = function() {
+        const h = window.innerHeight / 2;
+        cy.add([
+            { group: 'nodes', data: { id: 'start', label: 'Beginning', score: -2, color: nPos(-2), characters: ['Alpha'], settings: ['Base'] }, position: { x: 100, y: h - (-2 * Y_SCALE) } },
+            { group: 'nodes', data: { id: 'mid', label: 'Complication', score: -8, color: nPos(-8), characters: ['Alpha'], settings: ['Base'] }, position: { x: 350, y: h - (-8 * Y_SCALE) } },
+            { group: 'nodes', data: { id: 'end', label: 'End', score: 8, color: nPos(8), characters: ['Alpha'], settings: ['Base'] }, position: { x: 600, y: h - (8 * Y_SCALE) } },
+            { group: 'edges', data: { source: 'start', target: 'mid', action: 'Wants' } },
+            { group: 'edges', data: { source: 'mid', target: 'end', action: 'Overcomes' } }
+        ]);
+        registry.characters['Alpha'] = { h1: '', h2: '', desc: '' };
+        registry.settings['Base'] = { h1: '', h2: '', desc: '' };
+        refreshRegistry();
+        cy.fit(null, 50);
+    };
+
     function populateCategories() {
         ['action', 'emotions', 'utility', 'immersion'].forEach(key => {
             const catSelect = document.getElementById(`p-${key}-cat`);
@@ -158,10 +174,8 @@
     cy.on('tap', 'node', function(evt){
         let n = evt.target;
         if (n.data('type') === 'friction') return;
-        if (!sourceNode) { 
-            sourceNode = n; 
-            n.style({'border-width': 6, 'border-color': '#fff'});
-        } else {
+        if (!sourceNode) { sourceNode = n; n.style({'border-width': 6, 'border-color': '#fff'}); } 
+        else {
             if (sourceNode.id() === n.id()) { openInspector(n); } 
             else {
                 const s = sourceNode;
@@ -169,8 +183,7 @@
                     if (val) cy.add({ group: 'edges', data: { source: s.id(), target: n.id(), action: val } });
                 });
             }
-            sourceNode.style({'border-width': 0});
-            sourceNode = null;
+            sourceNode.style({'border-width': 0}); sourceNode = null;
         }
     });
 
@@ -181,49 +194,33 @@
     });
 
     function handleConnectorChoice(choice) {
-        const edge = activeEdge;
-        const sNode = edge.source();
-        const tNode = edge.target();
-        const originalAction = edge.data('action');
-
+        const edge = activeEdge; const sNode = edge.source(); const tNode = edge.target(); const originalAction = edge.data('action');
         const midX = (sNode.position().x + tNode.position().x) / 2;
         const midY = (sNode.position().y + tNode.position().y) / 2;
 
         if (choice === 'F') {
-            showCustomPrompt("Friction Label", "e.g. Conflict", (fLab) => {
+            showCustomPrompt("Friction Label", "Conflict...", (fLab) => {
                 const frictionId = 'f' + Date.now();
                 cy.remove(edge);
-                cy.add({ 
-                    group: 'nodes', 
-                    data: { id: frictionId, type: "friction", label: fLab || "PIN", characters: [], settings: [] }, 
-                    position: { x: midX, y: midY } 
-                });
+                cy.add({ group: 'nodes', data: { id: frictionId, type: "friction", label: fLab || "PIN", characters: [], settings: [] }, position: { x: midX, y: midY } });
                 cy.add([{ group: 'edges', data: { source: sNode.id(), target: frictionId, action: "friction" } },{ group: 'edges', data: { source: frictionId, target: tNode.id(), action: originalAction } }]);
             });
         } else if (choice === 'N') {
             const midId = 'n' + Date.now();
             cy.remove(edge);
-            cy.add({ 
-                group: 'nodes', 
-                data: { id: midId, label: "Complication", score: 0, color: '#444', characters: [], settings: [] }, 
-                position: { x: midX, y: midY } 
-            });
+            cy.add({ group: 'nodes', data: { id: midId, label: "Complication", score: 0, color: '#444', characters: [], settings: [] }, position: { x: midX, y: midY } });
             cy.add([{ group: 'edges', data: { source: sNode.id(), target: midId, action: "leads to" } }, { group: 'edges', data: { source: midId, target: tNode.id(), action: originalAction } }]);
         }
-        closeAllModals();
-        refreshRegistry();
+        closeAllModals(); refreshRegistry();
     }
 
-    function triggerRename() {
-        showCustomPrompt("Rename Label", "New action text...", (val) => { if(val) activeEdge.data('action', val); });
-    }
+    function triggerRename() { showCustomPrompt("Rename Label", "Label...", (val) => { if(val) activeEdge.data('action', val); }); }
 
     function openInspector(n) {
-        activeNode = n; const d = n.data();
-        populateCategories();
+        activeNode = n; const d = n.data(); populateCategories();
         document.getElementById('inspector-popup').style.display = 'block';
         document.querySelector('.overlay').style.display = 'block';
-        ['label', 'score', 'char', 'set'].forEach(f => document.getElementById('p-'+f).value = d[f] || (f==='score'?0:''));
+        ['label', 'score'].forEach(f => document.getElementById('p-'+f).value = d[f] || (f==='score'?0:''));
         ['action', 'emotions', 'immersion', 'utility'].forEach(f => document.getElementById('p-'+f+'-val').value = d[f] || '');
         document.getElementById('p-char').value = (d.characters || []).join(', ');
         document.getElementById('p-set').value = (d.settings || []).join(', ');
@@ -234,16 +231,7 @@
         const score = document.getElementById('p-score').value;
         const chars = document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s);
         const sets = document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s);
-        
-        activeNode.data({
-            label: document.getElementById('p-label').value, score: score,
-            characters: chars, settings: sets,
-            action: document.getElementById('p-action-val').value,
-            emotions: document.getElementById('p-emotions-val').value,
-            immersion: document.getElementById('p-immersion-val').value,
-            utility: document.getElementById('p-utility-val').value,
-            color: nPos(score)
-        });
+        activeNode.data({ label: document.getElementById('p-label').value, score: score, characters: chars, settings: sets, action: document.getElementById('p-action-val').value, emotions: document.getElementById('p-emotions-val').value, immersion: document.getElementById('p-immersion-val').value, utility: document.getElementById('p-utility-val').value, color: nPos(score) });
         activeNode.position('y', (window.innerHeight/2) - (score * Y_SCALE));
         chars.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { h1: '', h2: '', desc: '' }; });
         sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { h1: '', h2: '', desc: '' }; });
@@ -252,48 +240,18 @@
     }
 
     function applyLens(type, name) {
-        lensMode = { type: type, name: name };
-        const dataKey = type === 'characters' ? 'characters' : 'settings';
-        const targetName = name.trim().toLowerCase();
-
+        lensMode = { type: type, name: name }; const dataKey = type === 'characters' ? 'characters' : 'settings'; const targetName = name.trim().toLowerCase();
         cy.elements().removeClass('lens-highlight').addClass('ghost');
-        
-        const matches = cy.nodes().filter(n => {
-            const list = n.data(dataKey) || [];
-            return list.some(item => item.trim().toLowerCase() === targetName);
-        });
-
+        const matches = cy.nodes().filter(n => { const list = n.data(dataKey) || []; return list.some(item => item.trim().toLowerCase() === targetName); });
         matches.removeClass('ghost').addClass('lens-highlight');
-
-        cy.edges().forEach(e => {
-            const sList = e.source().data(dataKey) || [];
-            const tList = e.target().data(dataKey) || [];
-            if (sList.some(i => i.trim().toLowerCase() === targetName) && tList.some(i => i.trim().toLowerCase() === targetName)) {
-                e.removeClass('ghost').addClass('lens-highlight');
-            }
-        });
+        cy.edges().forEach(e => { const sList = e.source().data(dataKey) || []; const tList = e.target().data(dataKey) || []; if (sList.some(i => i.trim().toLowerCase() === targetName) && tList.some(i => i.trim().toLowerCase() === targetName)) e.removeClass('ghost').addClass('lens-highlight'); });
         refreshRegistry();
     }
 
     function clearHighlights() {
-        lensMode = { type: null, name: null };
-        cy.elements().removeClass('ghost').removeClass('lens-highlight');
-        
-        // RE-FIX: Hard reset to ensure shapes don't warp into ellipses
-        cy.nodes().forEach(n => {
-            const baseW = n.data('type') === 'friction' ? 35 : 80;
-            const shape = n.data('type') === 'friction' ? 'diamond' : 'ellipse';
-            n.style({
-                'width': baseW,
-                'height': baseW,
-                'shape': shape,
-                'opacity': 1,
-                'text-opacity': 1,
-                'border-width': 0
-            });
-        });
-        cy.edges().style({ 'line-color': '#333', 'width': 4, 'opacity': 1 });
-        refreshRegistry();
+        lensMode = { type: null, name: null }; cy.elements().removeClass('ghost').removeClass('lens-highlight');
+        cy.nodes().forEach(n => { const baseW = n.data('type') === 'friction' ? 35 : 80; const shape = n.data('type') === 'friction' ? 'diamond' : 'ellipse'; n.style({ 'width': baseW, 'height': baseW, 'shape': shape, 'opacity': 1, 'text-opacity': 1, 'border-width': 0 }); });
+        cy.edges().style({ 'line-color': '#333', 'width': 4, 'opacity': 1 }); refreshRegistry();
     }
 
     function refreshRegistry() {
@@ -302,14 +260,7 @@
             html += `<h4 style="color:#00d4ff; margin-bottom:5px;">${type.toUpperCase()}</h4>`;
             for (let name in registry[type]) {
                 const active = (lensMode.type === type && lensMode.name === name) ? 'active-lens' : '';
-                html += `<div class="registry-item ${active}" onclick="applyLens('${type}', '${name}')">
-                    <strong>${name}</strong>
-                    <div style="display:flex; gap:5px; margin:5px 0;" onclick="event.stopPropagation()">
-                        <input placeholder="Hybrid A" value="${registry[type][name].h1||''}" onchange="registry.${type}['${name}'].h1=this.value; refreshRegistry()">
-                        <input placeholder="Hybrid B" value="${registry[type][name].h2||''}" onchange="registry.${type}['${name}'].h2=this.value; refreshRegistry()">
-                    </div>
-                    <textarea placeholder="Descriptor..." onclick="event.stopPropagation()" onchange="registry.${type}['${name}'].desc=this.value">${registry[type][name].desc||''}</textarea>
-                </div>`;
+                html += `<div class="registry-item ${active}" onclick="applyLens('${type}', '${name}')"><strong>${name}</strong><div style="display:flex; gap:5px; margin:5px 0;" onclick="event.stopPropagation()"><input placeholder="Hybrid A" value="${registry[type][name].h1||''}" onchange="registry.${type}['${name}'].h1=this.value; refreshRegistry()"><input placeholder="Hybrid B" value="${registry[type][name].h2||''}" onchange="registry.${type}['${name}'].h2=this.value; refreshRegistry()"></div><textarea placeholder="Descriptor..." onclick="event.stopPropagation()" onchange="registry.${type}['${name}'].desc=this.value">${registry[type][name].desc||''}</textarea></div>`;
             }
         });
         document.getElementById('registry-content').innerHTML = html;
@@ -317,7 +268,7 @@
 
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
     function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; if(sourceNode) sourceNode.unselect(); sourceNode = null; }
-    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v39.json"; a.click(); }
+    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v40.json"; a.click(); }
     function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
 </body>
