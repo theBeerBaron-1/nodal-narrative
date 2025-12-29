@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v27</title>
+    <title>Narrative Systems Engine v28</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -9,26 +9,27 @@
         #cy { flex-grow: 1; background: #0f0f0f; }
         #registry-panel { width: 400px; background: #151515; border-left: 1px solid #333; padding: 20px; overflow-y: auto; }
         .registry-item { background: #222; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #00d4ff; }
+        
+        /* Modals */
         .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 3000; box-shadow: 0 0 60px #000; width: 450px; }
-        #inspector-popup { width: 850px; z-index: 2100; }
+        #inspector-popup { width: 850px; z-index: 2000; }
+        
         .pop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 10px; border-radius: 8px; border: 1px solid #333; }
         button { cursor: pointer; padding: 6px 12px; margin: 2px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 11px; }
-        input, textarea { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; }
+        input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; }
         label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 10px; }
+        
+        /* Dropdown Styling */
+        optgroup { background: #111; color: #00d4ff; font-style: normal; }
+        option { background: #222; color: #fff; }
+
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
-        .wheel-cat { background: #005f73; padding: 8px; margin: 10px 0 5px 0; border-radius: 4px; font-weight: bold; cursor: pointer; }
-        .wheel-item { width: 100%; text-align: left; background: #222; border: 1px solid #444; color: #fff; padding: 6px; margin: 2px 0; border-radius: 4px; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="overlay" onclick="closeAllModals()"></div>
-
-<div id="wheel-modal" class="custom-modal">
-    <h3 id="wheel-title" style="color:#00d4ff; margin:0 0 15px 0;">Lexical Families</h3>
-    <div id="wheel-content"></div>
-</div>
 
 <div id="connector-modal" class="custom-modal">
     <h3 style="color:#00d4ff; margin:0 0 15px 0;">Connector Action</h3>
@@ -50,7 +51,7 @@
     <div class="controls">
         <button onclick="addNode()">+ New Scene</button>
         <button onclick="cy.fit(null, 50)">Auto-Zoom</button>
-        <button onclick="exportDeep()">Export Deep JSON</button>
+        <button onclick="exportDeep()">Export JSON</button>
         <button onclick="document.getElementById('importFile').click()">Import JSON</button>
         <input type="file" id="importFile" style="display:none" onchange="importDeep(event)">
     </div>
@@ -66,10 +67,21 @@
                 <label>Setting</label><input id="p-set">
             </div>
             <div>
-                <label>Action <button onclick="openWheel('action')">🔍 Family</button></label><input id="p-action">
-                <label>Emotions <button onclick="openWheel('emotions')">🔍 Family</button></label><input id="p-emotions">
-                <label>Immersion <button onclick="openWheel('immersion')">🔍 Family</button></label><input id="p-immersion">
-                <label>Utility <button onclick="openWheel('utility')">🔍 Family</button></label><input id="p-utility">
+                <label>Action Family</label>
+                <select id="p-action-sel" onchange="document.getElementById('p-action-val').value=this.value"></select>
+                <input id="p-action-val" placeholder="Refine Action...">
+
+                <label>Emotions Family</label>
+                <select id="p-emotions-sel" onchange="document.getElementById('p-emotions-val').value=this.value"></select>
+                <input id="p-emotions-val" placeholder="Refine Emotion...">
+
+                <label>Immersion (Sensory)</label>
+                <select id="p-immersion-sel" onchange="document.getElementById('p-immersion-val').value=this.value"></select>
+                <input id="p-immersion-val" placeholder="Refine Sensory Detail...">
+
+                <label>Utility</label>
+                <select id="p-utility-sel" onchange="document.getElementById('p-utility-val').value=this.value"></select>
+                <input id="p-utility-val" placeholder="Refine Systemic Role...">
             </div>
         </div>
         <button style="margin-top:25px; width:100%; padding:12px; background:#005f73; border:none; color:white; font-weight:bold;" onclick="saveAndClose()">Save & Exit</button>
@@ -82,21 +94,39 @@
     let activeNode = null, sourceNode = null, activeEdge = null, registry = { characters: {}, settings: {} };
     const Y_SCALE = 60;
 
-    const families = {
-        action: { "Conflict": ["Confronts", "Attacks", "Sabotages"], "Social": ["Negotiates", "Confesses", "Persuades"], "Discovery": ["Discovers", "Infiltrates", "Explores"] },
-        emotions: { "High Energy": ["Euphoria", "Terror", "Rage"], "Low Energy": ["Melancholy", "Dread", "Despair"], "Reflective": ["Nostalgia", "Hope", "Awe"] },
-        utility: { "Structure": ["Inciting Incident", "Midpoint Pivot", "Resolution"], "Development": ["Characterisation Shift", "Thematic Setup", "World Building"] },
-        immersion: { "Sensory": ["Sulphurous", "Rot-sweet", "Iron-tanged", "Dust-caked"], "Visual": ["Neon-soaked", "Bleached", "Luminous"] }
+    const banks = {
+        action: { "Conflict": ["Confronts", "Attacks", "Sabotages"], "Subterfuge": ["Betrays", "Deceives", "Infiltrates"], "Social": ["Negotiates", "Confesses", "Persuades"] },
+        emotions: { "High Energy": ["Euphoria", "Terror", "Rage"], "Low Energy": ["Melancholy", "Dread", "Despair"], "Internal": ["Nostalgia", "Hope", "Shame"] },
+        utility: { "Structural": ["Inciting Incident", "Midpoint Pivot", "Resolution"], "Developmental": ["Character Intro", "Thematic Setup", "World Building"] },
+        immersion: { "Sensory": ["Sulphurous", "Rot-sweet", "Iron-tanged", "Dust-caked"], "Environmental": ["Neon-soaked", "Bleached", "Luminous", "Weatherworn"] }
     };
 
     var cy = cytoscape({
         container: document.getElementById('cy'),
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'text-wrap': 'wrap' }},
-            { selector: 'node[type="friction"]', style: { 'width': 30, 'height': 30, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top', 'z-index': 10 }},
+            { selector: 'node[type="friction"]', style: { 'width': 35, 'height': 35, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top', 'z-index': 999 }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }}
         ]
     });
+
+    function populateDropdowns() {
+        for (let key in banks) {
+            const select = document.getElementById(`p-${key}-sel`);
+            select.innerHTML = '<option value="">Select from Family...</option>';
+            for (let group in banks[key]) {
+                let optgroup = document.createElement('optgroup');
+                optgroup.label = group;
+                banks[key][group].forEach(word => {
+                    let opt = document.createElement('option');
+                    opt.value = word;
+                    opt.innerText = word;
+                    optgroup.appendChild(opt);
+                });
+                select.appendChild(optgroup);
+            }
+        }
+    }
 
     function showCustomPrompt(title, placeholder, callback) {
         document.querySelector('.overlay').style.display = 'block';
@@ -104,12 +134,8 @@
         modal.style.display = 'block';
         document.getElementById('modal-title').innerText = title;
         const input = document.getElementById('modal-input');
-        input.value = '';
-        input.placeholder = placeholder;
-        document.getElementById('modal-confirm').onclick = () => {
-            callback(input.value);
-            closeAllModals();
-        };
+        input.value = ''; input.placeholder = placeholder;
+        document.getElementById('modal-confirm').onclick = () => { callback(input.value); closeAllModals(); };
     }
 
     function addNode() {
@@ -119,6 +145,7 @@
 
     cy.on('tap', 'node', function(evt){
         let n = evt.target;
+        if (n.data('type') === 'friction') return;
         if (!sourceNode) { sourceNode = n; n.select(); } 
         else {
             if (sourceNode.id() === n.id()) { openInspector(n); } 
@@ -142,13 +169,15 @@
         const edge = activeEdge;
         const midX = (edge.source().position('x') + edge.target().position('x')) / 2;
         const midY = (edge.source().position('y') + edge.target().position('y')) / 2;
+        
         if (choice === 'N') {
             const midId = 'n' + Date.now();
             cy.add({ group: 'nodes', data: { id: midId, label: "Complication", score: 0, color: '#444' }, position: { x: midX, y: midY } });
             cy.add([{ group: 'edges', data: { source: edge.source().id(), target: midId, action: "leads to" } }, { group: 'edges', data: { source: midId, target: edge.target().id(), action: edge.data('action') } }]);
             cy.remove(edge);
         } else if (choice === 'F') {
-            showCustomPrompt("Friction Label", "e.g., Hidden Trap", (fLab) => {
+            // IMMEDIATE CREATION: Pin data is stored before prompt to ensure focus
+            showCustomPrompt("Friction Label", "e.g., Hidden Doubt", (fLab) => {
                 cy.add({ group: 'nodes', data: { id: 'f'+Date.now(), type: "friction", label: fLab || "PIN" }, position: { x: midX, y: midY } });
             });
         }
@@ -159,48 +188,35 @@
         showCustomPrompt("Rename Action", "New label...", (val) => { if(val) activeEdge.data('action', val); });
     }
 
-    function openWheel(key) {
-        document.getElementById('wheel-modal').style.display = 'block';
-        document.querySelector('.overlay').style.display = 'block';
-        let html = '';
-        for (let cat in families[key]) {
-            html += `<div class="wheel-cat">${cat}</div>`;
-            families[key][cat].forEach(w => { html += `<button class="wheel-item" onclick="selectWord('${key}','${w}')">${w}</button>`; });
-        }
-        document.getElementById('wheel-content').innerHTML = html;
-    }
-
-    function selectWord(key, word) {
-        document.getElementById('p-' + key).value = word;
-        document.getElementById('wheel-modal').style.display = 'none';
-    }
-
     function openInspector(n) {
         activeNode = n; const d = n.data();
+        populateDropdowns();
         document.getElementById('inspector-popup').style.display = 'block';
         document.querySelector('.overlay').style.display = 'block';
         ['label', 'score', 'char', 'set', 'action', 'emotions', 'immersion', 'utility'].forEach(f => {
-            let el = document.getElementById('p-' + f);
-            if (f === 'char' || f === 'set') el.value = (d[f + 'acters'] || d[f + 'tings'] || []).join(', ');
-            else el.value = d[f] || '';
+            let valField = document.getElementById('p-' + f + (['label','score','char','set'].includes(f) ? '' : '-val'));
+            if (f === 'char' || f === 'set') valField.value = (d[f + 'acters'] || d[f + 'tings'] || []).join(', ');
+            else valField.value = d[f] || (f === 'score' ? 0 : '');
         });
     }
 
     function saveAndClose() {
-        const d = {
-            label: document.getElementById('p-label').value, score: document.getElementById('p-score').value,
-            characters: document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s),
-            settings: document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s),
-            action: document.getElementById('p-action').value, emotions: document.getElementById('p-emotions').value,
-            immersion: document.getElementById('p-immersion').value, utility: document.getElementById('p-utility').value,
-            color: nPos(document.getElementById('p-score').value)
-        };
-        activeNode.data(d);
-        activeNode.position('y', (window.innerHeight/2) - (d.score * Y_SCALE));
-        d.characters.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { hybrid1: '', hybrid2: '', desc: '' }; });
-        d.settings.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { hybrid1: '', hybrid2: '', desc: '' }; });
-        refreshRegistry();
-        closeAllModals();
+        const score = document.getElementById('p-score').value;
+        const chars = document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s);
+        const sets = document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s);
+        activeNode.data({
+            label: document.getElementById('p-label').value, score: score,
+            characters: chars, settings: sets,
+            action: document.getElementById('p-action-val').value,
+            emotions: document.getElementById('p-emotions-val').value,
+            immersion: document.getElementById('p-immersion-val').value,
+            utility: document.getElementById('p-utility-val').value,
+            color: nPos(score)
+        });
+        activeNode.position('y', (window.innerHeight/2) - (score * Y_SCALE));
+        chars.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { h1: '', h2: '', desc: '' }; });
+        sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { h1: '', h2: '', desc: '' }; });
+        refreshRegistry(); closeAllModals();
     }
 
     function refreshRegistry() {
@@ -211,10 +227,10 @@
                 const item = registry[type][name];
                 html += `<div class="registry-item"><strong>${name}</strong>
                     <div style="display:flex; gap:5px; margin:5px 0;">
-                        <input placeholder="Hybrid A" value="${item.hybrid1}" onchange="registry.${type}['${name}'].hybrid1=this.value; refreshRegistry()">
-                        <input placeholder="Hybrid B" value="${item.hybrid2}" onchange="registry.${type}['${name}'].hybrid2=this.value; refreshRegistry()">
+                        <input placeholder="Hybrid A" value="${item.h1||''}" onchange="registry.${type}['${name}'].h1=this.value; refreshRegistry()">
+                        <input placeholder="Hybrid B" value="${item.h2||''}" onchange="registry.${type}['${name}'].h2=this.value; refreshRegistry()">
                     </div>
-                    <textarea placeholder="Descriptor..." onchange="registry.${type}['${name}'].desc=this.value">${item.desc}</textarea>
+                    <textarea placeholder="Descriptor..." onchange="registry.${type}['${name}'].desc=this.value">${item.desc||''}</textarea>
                 </div>`;
             }
         });
@@ -223,7 +239,7 @@
 
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
     function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; if(sourceNode) sourceNode.unselect(); sourceNode = null; }
-    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v27.json"; a.click(); }
+    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v28.json"; a.click(); }
     function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
 </body>
