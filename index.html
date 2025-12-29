@@ -162,40 +162,46 @@
         document.getElementById('connector-modal').style.display = 'block';
     });
 
-    function handleConnectorChoice(choice) {
-        const edge = activeEdge;
-        const sNode = edge.source();
-        const tNode = edge.target();
-        const originalAction = edge.data('action');
+function handleConnectorChoice(choice) {
+    const edge = activeEdge;
+    const sNode = edge.source();
+    const tNode = edge.target();
+    const originalAction = edge.data('action');
 
-        if (choice === 'F') {
-            showCustomPrompt("Friction Label", "e.g. Conflict", (fLab) => {
-                const frictionId = 'f' + Date.now();
-                const midX = (sNode.position().x + tNode.position().x) / 2;
-                const midY = (sNode.position().y + tNode.position().y) / 2;
-                
-                // Splice: Remove edge, add node in middle, connect both sides
-                cy.remove(edge);
-                cy.add({ 
-                    group: 'nodes', 
-                    data: { id: frictionId, type: "friction", label: fLab || "PIN" }, 
-                    position: { x: midX, y: midY } 
-                });
-                cy.add([
-                    { group: 'edges', data: { source: sNode.id(), target: frictionId, action: "friction" } },
-                    { group: 'edges', data: { source: frictionId, target: tNode.id(), action: originalAction } }
-                ]);
-            });
-        } else if (choice === 'N') {
-            const midId = 'n' + Date.now();
-            const midX = (sNode.position().x + tNode.position().x) / 2;
-            const midY = (sNode.position().y + tNode.position().y) / 2;
+    const midX = (sNode.position().x + tNode.position().x) / 2;
+    const midY = (sNode.position().y + tNode.position().y) / 2;
+
+    if (choice === 'F') {
+        showCustomPrompt("Friction Label", "e.g. Conflict", (fLab) => {
+            const frictionId = 'f' + Date.now();
             cy.remove(edge);
-            cy.add({ group: 'nodes', data: { id: midId, label: "Complication", score: 0, color: '#444' }, position: { x: midX, y: midY } });
-            cy.add([{ group: 'edges', data: { source: sNode.id(), target: midId, action: "leads to" } }, { group: 'edges', data: { source: midId, target: tNode.id(), action: originalAction } }]);
-        }
-        closeAllModals();
+            cy.add({ 
+                group: 'nodes', 
+                data: { id: frictionId, type: "friction", label: fLab || "PIN", characters: [], settings: [] }, 
+                position: { x: midX, y: midY } 
+            });
+            cy.add([
+                { group: 'edges', data: { source: sNode.id(), target: frictionId, action: "friction" } },
+                { group: 'edges', data: { source: frictionId, target: tNode.id(), action: originalAction } }
+            ]);
+        });
+    } else if (choice === 'N') {
+        const midId = 'n' + Date.now();
+        cy.remove(edge);
+        // FORCE: Initializing with empty arrays to prevent 'undefined' during lens application
+        cy.add({ 
+            group: 'nodes', 
+            data: { id: midId, label: "Complication", score: 0, color: '#444', characters: [], settings: [] }, 
+            position: { x: midX, y: midY } 
+        });
+        cy.add([
+            { group: 'edges', data: { source: sNode.id(), target: midId, action: "leads to" } },
+            { group: 'edges', data: { source: midId, target: tNode.id(), action: originalAction } }
+        ]);
     }
+    closeAllModals();
+    refreshRegistry(); // Ensure the registry sees new nodes immediately
+}
 
     function triggerRename() {
         showCustomPrompt("Rename Label", "New action text...", (val) => { if(val) activeEdge.data('action', val); });
