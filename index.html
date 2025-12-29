@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v41</title>
+    <title>Narrative Systems Engine v43</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -10,10 +10,8 @@
         #registry-panel { width: 420px; background: #151515; border-left: 1px solid #333; padding: 20px; overflow-y: auto; }
         .registry-item { background: #222; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #00d4ff; cursor: pointer; transition: 0.2s; }
         .registry-item.active-lens { border-left-color: #fff; background: #005f73; box-shadow: 0 0 15px #00d4ff; }
-        
         .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 3000; box-shadow: 0 0 60px #000; width: 450px; }
         #inspector-popup { width: 850px; z-index: 2000; }
-        
         .pop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 10px; border-radius: 8px; border: 1px solid #333; }
         button { cursor: pointer; padding: 6px 12px; margin: 2px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 11px; }
@@ -98,6 +96,7 @@
 
 <script>
     let activeNode = null, sourceNode = null, activeEdge = null, registry = { characters: {}, settings: {} };
+    let highlightedNodes = [];
     let lensMode = { type: null, name: null };
     const Y_SCALE = 60;
 
@@ -123,10 +122,8 @@
         const h = window.innerHeight / 2;
         cy.add([
             { group: 'nodes', data: { id: 'start', label: 'Beginning', score: -2, color: nPos(-2), characters: ['Alpha'], settings: ['Base'] }, position: { x: 100, y: h - (-2 * Y_SCALE) } },
-            { group: 'nodes', data: { id: 'mid', label: 'Complication', score: -8, color: nPos(-8), characters: ['Alpha'], settings: ['Base'] }, position: { x: 350, y: h - (-8 * Y_SCALE) } },
             { group: 'nodes', data: { id: 'end', label: 'End', score: 8, color: nPos(8), characters: ['Alpha'], settings: ['Base'] }, position: { x: 600, y: h - (8 * Y_SCALE) } },
-            { group: 'edges', data: { source: 'start', target: 'mid', action: 'Wants' } },
-            { group: 'edges', data: { source: 'mid', target: 'end', action: 'Overcomes' } }
+            { group: 'edges', data: { source: 'start', target: 'end', action: 'Wants' } }
         ]);
         registry.characters['Alpha'] = { h1: '', h2: '', desc: '' };
         registry.settings['Base'] = { h1: '', h2: '', desc: '' };
@@ -157,8 +154,7 @@
 
     function showCustomPrompt(title, placeholder, callback) {
         document.querySelector('.overlay').style.display = 'block';
-        const modal = document.getElementById('prompt-modal');
-        modal.style.display = 'block';
+        document.getElementById('prompt-modal').style.display = 'block';
         document.getElementById('modal-title').innerText = title;
         const input = document.getElementById('modal-input');
         input.value = ''; input.placeholder = placeholder;
@@ -175,7 +171,7 @@
         if (n.data('type') === 'friction') return;
         if (!sourceNode) { 
             sourceNode = n; 
-            n.style({'border-width': 6, 'border-color': '#fff'});
+            highlightNode(n);
         } else {
             if (sourceNode.id() === n.id()) { openInspector(n); } 
             else {
@@ -184,7 +180,7 @@
                     if (val) cy.add({ group: 'edges', data: { source: s.id(), target: n.id(), action: val } });
                 });
             }
-            sourceNode.style({'border-width': 0});
+            resetHighlights();
             sourceNode = null;
         }
     });
@@ -195,45 +191,59 @@
         document.getElementById('connector-modal').style.display = 'block';
     });
 
-function handleConnectorChoice(choice) {
-    const edge = activeEdge; 
-    if (!edge) return;
+    function handleConnectorChoice(choice) {
+        if (!activeEdge) return;
+        const edge = activeEdge;
+        const sNode = edge.source();
+        const tNode = edge.target();
+        const originalAction = edge.data('action');
+        const midX = (sNode.position().x + tNode.position().x) / 2;
+        const midY = (sNode.position().y + tNode.position().y) / 2;
 
-    const sNode = edge.source(); 
-    const tNode = edge.target(); 
-    const originalAction = edge.data('action');
-    const midX = (sNode.position().x + tNode.position().x) / 2;
-    const midY = (sNode.position().y + tNode.position().y) / 2;
+        const addIntermediateNode = (label, type = "intermediate") => {
+            const midId = type[0] + Date.now();
+            const dx = tNode.position().x - sNode.position().x;
+            const dy = tNode.position().y - sNode.position().y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            const offset = 80;
+            const perpX = (dy / length) * offset;
+            const perpY = (-dx / length) * offset;
 
-    const addIntermediateNode = (label, type="intermediate") => {
-        const midId = type[0] + Date.now();
-        cy.remove(edge);
+            cy.remove(edge);
+            const newNode = cy.add({
+                group: 'nodes',
+                data: { id: midId, label: label, type: type, score: 0, color: '#444', characters: [], settings: [] },
+                position: { x: midX + perpX, y: midY + perpY }
+            });
+            cy.add([
+                { group: 'edges', data: { source: sNode.id(), target: midId, action: type === "friction" ? "friction" : "leads to" } },
+                { group: 'edges', data: { source: midId, target: tNode.id(), action: originalAction } }
+            ]);
+            refreshRegistry();
+        };
 
-        const newNode = cy.add({
-            group: 'nodes',
-            data: { id: midId, label: label, type: type, score: 0, color: '#444', characters: [], settings: [] },
-            position: { x: midX, y: midY }
-        });
-
-        cy.add([
-            { group: 'edges', data: { source: sNode.id(), target: midId, action: type === "friction" ? "friction" : "leads to" } },
-            { group: 'edges', data: { source: midId, target: tNode.id(), action: originalAction } }
-        ]);
-
-        refreshRegistry();
-    };
-
-    if (choice === 'F') {
-        showCustomPrompt("Friction Label", "Conflict...", (fLab) => {
-            addIntermediateNode(fLab || "PIN", "friction");
+        if (choice === 'F') {
+            showCustomPrompt("Friction Label", "Conflict...", (fLab) => {
+                addIntermediateNode(fLab || "PIN", "friction");
+                closeAllModals();
+            });
+        } else if (choice === 'N') {
+            addIntermediateNode("Complication", "intermediate");
             closeAllModals();
-        });
-    } else if (choice === 'N') {
-        addIntermediateNode("Complication", "intermediate");
-        closeAllModals();
+        }
     }
-}
 
+    function highlightNode(node) {
+        if (!node) return;
+        node.scratch('origStyle', { 'border-width': node.style('border-width'), 'border-color': node.style('border-color'), 'width': node.style('width'), 'height': node.style('height') });
+        node.style({ 'border-width': 6, 'border-color': '#00d4ff', 'width': parseFloat(node.style('width')) * 1.2, 'height': parseFloat(node.style('height')) * 1.2 });
+        highlightedNodes.push(node);
+    }
+
+    function resetHighlights() {
+        highlightedNodes.forEach(n => { const orig = n.scratch('origStyle'); if (orig) n.style(orig); });
+        highlightedNodes = [];
+    }
 
     function triggerRename() { showCustomPrompt("Rename Label", "Label...", (val) => { if(val) activeEdge.data('action', val); }); }
 
@@ -271,10 +281,7 @@ function handleConnectorChoice(choice) {
 
     function clearHighlights() {
         lensMode = { type: null, name: null }; cy.elements().removeClass('ghost').removeClass('lens-highlight');
-        cy.nodes().forEach(n => { 
-            const isF = n.data('type') === 'friction';
-            n.style({ 'width': isF ? 35 : 80, 'height': isF ? 35 : 80, 'shape': isF ? 'diamond' : 'ellipse', 'opacity': 1, 'text-opacity': 1, 'border-width': 0 }); 
-        });
+        cy.nodes().forEach(n => { const isF = n.data('type') === 'friction'; n.style({ 'width': isF ? 35 : 80, 'height': isF ? 35 : 80, 'shape': isF ? 'diamond' : 'ellipse', 'opacity': 1, 'border-width': 0 }); });
         cy.edges().style({ 'line-color': '#333', 'width': 4, 'opacity': 1 }); refreshRegistry();
     }
 
@@ -291,8 +298,8 @@ function handleConnectorChoice(choice) {
     }
 
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
-    function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; if(sourceNode) sourceNode.unselect(); sourceNode = null; }
-    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v41.json"; a.click(); }
+    function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; sourceNode = null; }
+    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v43.json"; a.click(); }
     function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
 </body>
