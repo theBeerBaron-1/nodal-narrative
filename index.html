@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v36</title>
+    <title>Narrative Systems Engine v37</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -30,7 +30,7 @@
     <h3 style="color:#00d4ff; margin:0 0 15px 0;">Connector Action</h3>
     <button onclick="triggerRename()" style="width:100%; padding:12px; margin-bottom:8px;">✎ Rename Label</button>
     <button onclick="handleConnectorChoice('N')" style="width:100%; padding:12px; margin-bottom:8px;">+ Add Complication Node</button>
-    <button onclick="handleConnectorChoice('F')" style="width:100%; padding:12px;">+ Add Friction Pin</button>
+    <button onclick="handleConnectorChoice('F')" style="width:100%; padding:12px;">+ Add Friction Node</button>
 </div>
 
 <div id="prompt-modal" class="custom-modal">
@@ -98,11 +98,9 @@
     var cy = cytoscape({
         container: document.getElementById('cy'),
         style: [
-            { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'text-wrap': 'wrap' }},
-            { selector: 'node[type="friction"]', style: { 'width': 30, 'height': 30, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top', 'z-index': 999 }},
-            { selector: 'node[type="midpoint"]', style: { 'width': 1, 'height': 1, 'background-color': '#00d4ff', 'opacity': 0, 'label': '' }},
+            { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'shape': 'ellipse', 'text-wrap': 'wrap' }},
+            { selector: 'node[type="friction"]', style: { 'width': 30, 'height': 30, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top' }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }},
-            { selector: 'edge[type="needle"]', style: { 'width': 2, 'line-color': '#ff4500', 'line-style': 'dashed', 'target-arrow-shape': 'none' }},
             { selector: '.ghost', style: { 'opacity': 0.02, 'text-opacity': 0 }},
             { selector: '.lens-highlight', style: { 'border-width': 8, 'border-color': '#00d4ff', 'line-color': '#00d4ff', 'width': 8, 'opacity': 1, 'text-opacity': 1 }}
         ]
@@ -136,12 +134,12 @@
 
     function addNode() {
         const id = 'n' + Date.now();
-        cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444' }, position: { x: (cy.nodes().filter('[type!="friction"][type!="midpoint"]').length * 220) + 100, y: window.innerHeight/2 } });
+        cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444' }, position: { x: (cy.nodes().filter('[type!="friction"]').length * 220) + 100, y: window.innerHeight/2 } });
     }
 
     cy.on('tap', 'node', function(evt){
         let n = evt.target;
-        if (n.data('type') === 'friction' || n.data('type') === 'midpoint') return;
+        if (n.data('type') === 'friction') return;
         if (!sourceNode) { 
             sourceNode = n; 
             n.style({'border-width': 6, 'border-color': '#fff'});
@@ -159,7 +157,6 @@
     });
 
     cy.on('tap', 'edge', function(evt){
-        if(evt.target.data('type') === 'needle') return;
         activeEdge = evt.target;
         document.querySelector('.overlay').style.display = 'block';
         document.getElementById('connector-modal').style.display = 'block';
@@ -167,32 +164,35 @@
 
     function handleConnectorChoice(choice) {
         const edge = activeEdge;
-        const sPos = edge.source().position();
-        const tPos = edge.target().position();
-        const midX = (sPos.x + tPos.x) / 2;
-        const midY = (sPos.y + tPos.y) / 2;
+        const sNode = edge.source();
+        const tNode = edge.target();
+        const originalAction = edge.data('action');
 
         if (choice === 'F') {
             showCustomPrompt("Friction Label", "e.g. Conflict", (fLab) => {
-                const midId = 'mid' + Date.now();
-                const pinId = 'f' + Date.now();
-                const dx = tPos.x - sPos.x;
-                const dy = tPos.y - sPos.y;
-                const len = Math.sqrt(dx*dx + dy*dy) || 1;
-                const nx = -dy / len;
-                const ny = dx / len;
-
+                const frictionId = 'f' + Date.now();
+                const midX = (sNode.position().x + tNode.position().x) / 2;
+                const midY = (sNode.position().y + tNode.position().y) / 2;
+                
+                // Splice: Remove edge, add node in middle, connect both sides
+                cy.remove(edge);
+                cy.add({ 
+                    group: 'nodes', 
+                    data: { id: frictionId, type: "friction", label: fLab || "PIN" }, 
+                    position: { x: midX, y: midY } 
+                });
                 cy.add([
-                    { group: 'nodes', data: { id: midId, type: 'midpoint' }, position: { x: midX, y: midY } },
-                    { group: 'nodes', data: { id: pinId, type: "friction", label: fLab || "PIN" }, position: { x: midX + (nx * 65), y: midY + (ny * 65) } },
-                    { group: 'edges', data: { id: 'e'+pinId, source: midId, target: pinId, type: 'needle' } }
+                    { group: 'edges', data: { source: sNode.id(), target: frictionId, action: "friction" } },
+                    { group: 'edges', data: { source: frictionId, target: tNode.id(), action: originalAction } }
                 ]);
             });
         } else if (choice === 'N') {
             const midId = 'n' + Date.now();
-            cy.add({ group: 'nodes', data: { id: midId, label: "Complication", score: 0, color: '#444' }, position: { x: midX, y: midY } });
-            cy.add([{ group: 'edges', data: { source: edge.source().id(), target: midId, action: "leads to" } }, { group: 'edges', data: { source: midId, target: edge.target().id(), action: edge.data('action') } }]);
+            const midX = (sNode.position().x + tNode.position().x) / 2;
+            const midY = (sNode.position().y + tNode.position().y) / 2;
             cy.remove(edge);
+            cy.add({ group: 'nodes', data: { id: midId, label: "Complication", score: 0, color: '#444' }, position: { x: midX, y: midY } });
+            cy.add([{ group: 'edges', data: { source: sNode.id(), target: midId, action: "leads to" } }, { group: 'edges', data: { source: midId, target: tNode.id(), action: originalAction } }]);
         }
         closeAllModals();
     }
@@ -215,7 +215,6 @@
 
     function saveAndClose() {
         if (!activeNode) return;
-        const d = activeNode.data();
         const score = document.getElementById('p-score').value;
         const chars = document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s);
         const sets = document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s);
@@ -256,8 +255,9 @@
     function clearHighlights() {
         lensMode = { type: null, name: null };
         cy.elements().removeClass('ghost').removeClass('lens-highlight');
-        cy.nodes().style({'width': 80, 'height': 80, 'border-width': 0, 'opacity': 1, 'text-opacity': 1});
-        cy.nodes('[type="friction"]').style({'width': 30, 'height': 30});
+        // RE-FIX: Hard re-application of base shapes to prevent ellipse warping
+        cy.nodes().style({'width': 80, 'height': 80, 'shape': 'ellipse', 'opacity': 1, 'text-opacity': 1});
+        cy.nodes('[type="friction"]').style({'width': 30, 'height': 30, 'shape': 'diamond'});
         cy.edges().style({'line-color': '#333', 'width': 4, 'opacity': 1});
         refreshRegistry();
     }
@@ -283,7 +283,7 @@
 
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
     function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; }
-    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v36.json"; a.click(); }
+    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v37.json"; a.click(); }
     function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
 </body>
