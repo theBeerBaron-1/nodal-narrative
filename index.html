@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v40</title>
+    <title>Narrative Systems Engine v41</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -114,12 +114,11 @@
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'shape': 'ellipse', 'text-wrap': 'wrap' }},
             { selector: 'node[type="friction"]', style: { 'width': 35, 'height': 35, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top' }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }},
-            { selector: '.ghost', style: { 'opacity': 0.02, 'text-opacity': 0 }},
+            { selector: '.ghost', style: { 'opacity': 0.01, 'text-opacity': 0 }},
             { selector: '.lens-highlight', style: { 'border-width': 8, 'border-color': '#00d4ff', 'line-color': '#00d4ff', 'width': 8, 'opacity': 1, 'text-opacity': 1 }}
         ]
     });
 
-    // DEFAULT STARTUP ARC
     window.onload = function() {
         const h = window.innerHeight / 2;
         cy.add([
@@ -174,8 +173,10 @@
     cy.on('tap', 'node', function(evt){
         let n = evt.target;
         if (n.data('type') === 'friction') return;
-        if (!sourceNode) { sourceNode = n; n.style({'border-width': 6, 'border-color': '#fff'}); } 
-        else {
+        if (!sourceNode) { 
+            sourceNode = n; 
+            n.style({'border-width': 6, 'border-color': '#fff'});
+        } else {
             if (sourceNode.id() === n.id()) { openInspector(n); } 
             else {
                 const s = sourceNode;
@@ -183,7 +184,8 @@
                     if (val) cy.add({ group: 'edges', data: { source: s.id(), target: n.id(), action: val } });
                 });
             }
-            sourceNode.style({'border-width': 0}); sourceNode = null;
+            sourceNode.style({'border-width': 0});
+            sourceNode = null;
         }
     });
 
@@ -194,7 +196,10 @@
     });
 
     function handleConnectorChoice(choice) {
-        const edge = activeEdge; const sNode = edge.source(); const tNode = edge.target(); const originalAction = edge.data('action');
+        const edge = activeEdge;
+        const sNode = edge.source();
+        const tNode = edge.target();
+        const originalAction = edge.data('action');
         const midX = (sNode.position().x + tNode.position().x) / 2;
         const midY = (sNode.position().y + tNode.position().y) / 2;
 
@@ -244,13 +249,16 @@
         cy.elements().removeClass('lens-highlight').addClass('ghost');
         const matches = cy.nodes().filter(n => { const list = n.data(dataKey) || []; return list.some(item => item.trim().toLowerCase() === targetName); });
         matches.removeClass('ghost').addClass('lens-highlight');
-        cy.edges().forEach(e => { const sList = e.source().data(dataKey) || []; const tList = e.target().data(dataKey) || []; if (sList.some(i => i.trim().toLowerCase() === targetName) && tList.some(i => i.trim().toLowerCase() === targetName)) e.removeClass('ghost').addClass('lens-highlight'); });
+        cy.edges().forEach(e => { const sL = e.source().data(dataKey) || []; const tL = e.target().data(dataKey) || []; if (sL.some(i => i.trim().toLowerCase() === targetName) && tL.some(i => i.trim().toLowerCase() === targetName)) e.removeClass('ghost').addClass('lens-highlight'); });
         refreshRegistry();
     }
 
     function clearHighlights() {
         lensMode = { type: null, name: null }; cy.elements().removeClass('ghost').removeClass('lens-highlight');
-        cy.nodes().forEach(n => { const baseW = n.data('type') === 'friction' ? 35 : 80; const shape = n.data('type') === 'friction' ? 'diamond' : 'ellipse'; n.style({ 'width': baseW, 'height': baseW, 'shape': shape, 'opacity': 1, 'text-opacity': 1, 'border-width': 0 }); });
+        cy.nodes().forEach(n => { 
+            const isF = n.data('type') === 'friction';
+            n.style({ 'width': isF ? 35 : 80, 'height': isF ? 35 : 80, 'shape': isF ? 'diamond' : 'ellipse', 'opacity': 1, 'text-opacity': 1, 'border-width': 0 }); 
+        });
         cy.edges().style({ 'line-color': '#333', 'width': 4, 'opacity': 1 }); refreshRegistry();
     }
 
@@ -268,7 +276,7 @@
 
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
     function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; if(sourceNode) sourceNode.unselect(); sourceNode = null; }
-    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v40.json"; a.click(); }
+    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v41.json"; a.click(); }
     function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
 </body>
