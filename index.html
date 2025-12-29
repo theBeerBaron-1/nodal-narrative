@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v23</title>
+    <title>Narrative Systems Engine v24</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -11,14 +11,14 @@
         .registry-item { background: #222; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #00d4ff; }
         
         /* Custom Modals */
-        .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 2000; box-shadow: 0 0 60px #000; width: 450px; }
-        #inspector-popup { width: 850px; }
-        #wheel-modal { width: 350px; max-height: 80vh; overflow-y: auto; }
+        .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 2100; box-shadow: 0 0 60px #000; width: 450px; }
+        #inspector-popup { width: 850px; z-index: 2000; }
+        #wheel-modal { width: 350px; max-height: 80vh; overflow-y: auto; z-index: 2500; }
 
         .pop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 10px; border-radius: 8px; border: 1px solid #333; }
         button { cursor: pointer; padding: 6px 12px; margin: 2px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 11px; }
-        input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; }
+        input, textarea { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; }
         label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 10px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
         .wheel-item { width:100%; text-align:left; background:#222; border:1px solid #444; color:#fff; padding:8px; margin:2px 0; border-radius:4px; cursor:pointer; }
@@ -45,7 +45,8 @@
 <div id="main-wrapper">
     <div class="controls">
         <button onclick="addNode()">+ New Scene</button>
-        <button onclick="exportDeep()">Export Deep JSON</button>
+        <button onclick="autoZoom()">Auto-Zoom Center</button>
+        <button onclick="exportDeep()">Export JSON</button>
         <button onclick="document.getElementById('importFile').click()">Import JSON</button>
         <input type="file" id="importFile" style="display:none" onchange="importDeep(event)">
     </div>
@@ -78,16 +79,16 @@
     const Y_SCALE = 60;
 
     const banks = {
-        utility: ["Inciting Incident", "Characterisation Shift", "Problem Escalation", "Rising Tension", "Midpoint Pivot", "Resolution", "World Building"],
-        action: ["Confronts", "Betrays", "Escapes", "Discovers", "Negotiates", "Infiltrates", "Sacrifices"],
-        emotions: ["Melancholy", "Euphoria", "Resentment", "Dread", "Anticipation", "Hope", "Terror"],
-        immersion: ["Sulphurous", "Bleached", "Rot-sweet", "Airless", "Luminous", "Neon-soaked", "Iron-tanged"]
+        utility: ["Inciting Incident", "Characterisation Shift", "Problem Escalation", "Rising Tension", "Midpoint Pivot", "Resolution", "World Building", "Thematic Setup"],
+        action: ["Confronts", "Betrays", "Escapes", "Discovers", "Negotiates", "Infiltrates", "Sacrifices", "Sabotages"],
+        emotions: ["Melancholy", "Euphoria", "Resentment", "Dread", "Anticipation", "Hope", "Terror", "Awe"],
+        immersion: ["Sulphurous", "Bleached", "Rot-sweet", "Airless", "Luminous", "Neon-soaked", "Iron-tanged", "Velvet-dark"]
     };
 
     var cy = cytoscape({
         container: document.getElementById('cy'),
         style: [
-            { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px' }},
+            { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'text-wrap': 'wrap', 'text-max-width': '70px' }},
             { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#00d4ff' }},
             { selector: 'node[type="friction"]', style: { 'width': 30, 'height': 30, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top' }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }}
@@ -108,6 +109,11 @@
     function addNode() {
         const id = 'n' + Date.now();
         cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444' }, position: { x: (cy.nodes().length * 200) + 100, y: window.innerHeight/2 } });
+        autoZoom();
+    }
+
+    function autoZoom() {
+        cy.fit(cy.elements(), 50); // Automatically centers and zooms to show all elements with 50px padding
     }
 
     cy.on('tap', 'node', function(evt){
@@ -140,18 +146,25 @@
                     cy.add({ group: 'nodes', data: { id: 'f'+Date.now(), type: "friction", label: fLab || "PIN" }, position: { x: midX, y: midY } });
                 });
             }
+            autoZoom();
         });
     });
 
     function openWheel(key) {
         document.getElementById('wheel-modal').style.display = 'block';
         document.querySelector('.overlay').style.display = 'block';
+        document.getElementById('wheel-title').innerText = key.toUpperCase() + " FAMILY";
         document.getElementById('wheel-content').innerHTML = banks[key].map(w => `<button class="wheel-item" onclick="selectWord('${key}','${w}')">${w}</button>`).join('');
     }
 
     function selectWord(key, word) {
         document.getElementById('p-' + key).value = word;
-        closeAllModals();
+        // Specifically don't call closeAllModals so inspector stays open
+        document.getElementById('wheel-modal').style.display = 'none';
+        // Only turn off overlay if inspector isn't visible
+        if (document.getElementById('inspector-popup').style.display === 'none') {
+            document.querySelector('.overlay').style.display = 'none';
+        }
     }
 
     function openInspector(n) {
@@ -184,8 +197,16 @@
         sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { hybrid1: '', hybrid2: '', desc: '' }; });
         refreshRegistry();
         closeAllModals();
+        autoZoom();
     }
 
+    function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
+    function closeAllModals() { 
+        document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); 
+        document.querySelector('.overlay').style.display = 'none'; 
+        activeNode = null; 
+        if(sourceNode) sourceNode.unselect(); sourceNode = null; 
+    }
     function refreshRegistry() {
         let html = '';
         ['characters', 'settings'].forEach(type => {
@@ -198,17 +219,14 @@
                         <input placeholder="Hybrid A" value="${item.hybrid1}" onchange="registry.${type}['${name}'].hybrid1=this.value; refreshRegistry()">
                         <input placeholder="Hybrid B" value="${item.hybrid2}" onchange="registry.${type}['${name}'].hybrid2=this.value; refreshRegistry()">
                     </div>
-                    <textarea placeholder="Friction/Descriptor..." onchange="registry.${type}['${name}'].desc=this.value">${item.desc}</textarea>
+                    <textarea placeholder="Friction/Descriptor..." onchange="registry.${type}['${name}'].desc=this.value">${item.desc || ''}</textarea>
                 </div>`;
             }
         });
         document.getElementById('registry-content').innerHTML = html;
     }
-
-    function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
-    function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; if(sourceNode) sourceNode.unselect(); sourceNode = null; }
-    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v23.json"; a.click(); }
-    function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
+    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v24.json"; a.click(); }
+    function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); autoZoom(); }; r.readAsText(e.target.files[0]); }
 </script>
 </body>
 </html>
