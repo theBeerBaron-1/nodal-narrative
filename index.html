@@ -1,30 +1,28 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v28</title>
+    <title>Narrative Systems Engine v30</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
         #main-wrapper { display: flex; flex-grow: 1; flex-direction: column; position: relative; }
         #cy { flex-grow: 1; background: #0f0f0f; }
-        #registry-panel { width: 400px; background: #151515; border-left: 1px solid #333; padding: 20px; overflow-y: auto; }
+        #registry-panel { width: 420px; background: #151515; border-left: 1px solid #333; padding: 20px; overflow-y: auto; }
         .registry-item { background: #222; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #00d4ff; }
         
-        /* Modals */
         .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 3000; box-shadow: 0 0 60px #000; width: 450px; }
         #inspector-popup { width: 850px; z-index: 2000; }
         
         .pop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 10px; border-radius: 8px; border: 1px solid #333; }
         button { cursor: pointer; padding: 6px 12px; margin: 2px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 11px; }
-        input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; }
-        label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 10px; }
-        
-        /* Dropdown Styling */
-        optgroup { background: #111; color: #00d4ff; font-style: normal; }
-        option { background: #222; color: #fff; }
-
+        input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; font-family: inherit; }
+        label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 12px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
+        
+        .lexical-row { display: flex; gap: 5px; align-items: center; }
+        .lexical-row select { width: 40%; }
+        .lexical-row input { width: 60%; }
     </style>
 </head>
 <body>
@@ -33,9 +31,9 @@
 
 <div id="connector-modal" class="custom-modal">
     <h3 style="color:#00d4ff; margin:0 0 15px 0;">Connector Action</h3>
-    <button onclick="triggerRename()" style="width:100%; padding:10px; margin-bottom:8px;">✎ Rename Action</button>
-    <button onclick="handleConnectorChoice('N')" style="width:100%; padding:10px; margin-bottom:8px;">+ Add Complication Node</button>
-    <button onclick="handleConnectorChoice('F')" style="width:100%; padding:10px;">+ Add Friction Pin</button>
+    <button onclick="triggerRename()" style="width:100%; padding:12px; margin-bottom:8px;">✎ Rename Label</button>
+    <button onclick="handleConnectorChoice('N')" style="width:100%; padding:12px; margin-bottom:8px;">+ Add Complication Node</button>
+    <button onclick="handleConnectorChoice('F')" style="width:100%; padding:12px;">+ Drop Friction Pin</button>
 </div>
 
 <div id="prompt-modal" class="custom-modal">
@@ -62,29 +60,41 @@
         <div class="pop-grid">
             <div>
                 <label>Scene Label</label><input id="p-label">
-                <label>Score (-10 to 10)</label><input type="number" id="p-score">
+                <label>Emotional Score (-10 to 10)</label><input type="number" id="p-score">
                 <label>Characters</label><input id="p-char">
                 <label>Setting</label><input id="p-set">
             </div>
             <div>
                 <label>Action Family</label>
-                <select id="p-action-sel" onchange="document.getElementById('p-action-val').value=this.value"></select>
-                <input id="p-action-val" placeholder="Refine Action...">
+                <div class="lexical-row">
+                    <select id="p-action-cat" onchange="updateSubList('action', this.value)"></select>
+                    <select id="p-action-word" onchange="document.getElementById('p-action-val').value=this.value"></select>
+                </div>
+                <input id="p-action-val">
 
                 <label>Emotions Family</label>
-                <select id="p-emotions-sel" onchange="document.getElementById('p-emotions-val').value=this.value"></select>
-                <input id="p-emotions-val" placeholder="Refine Emotion...">
+                <div class="lexical-row">
+                    <select id="p-emotions-cat" onchange="updateSubList('emotions', this.value)"></select>
+                    <select id="p-emotions-word" onchange="document.getElementById('p-emotions-val').value=this.value"></select>
+                </div>
+                <input id="p-emotions-val">
 
                 <label>Immersion (Sensory)</label>
-                <select id="p-immersion-sel" onchange="document.getElementById('p-immersion-val').value=this.value"></select>
-                <input id="p-immersion-val" placeholder="Refine Sensory Detail...">
+                <div class="lexical-row">
+                    <select id="p-immersion-cat" onchange="updateSubList('immersion', this.value)"></select>
+                    <select id="p-immersion-word" onchange="document.getElementById('p-immersion-val').value=this.value"></select>
+                </div>
+                <input id="p-immersion-val">
 
                 <label>Utility</label>
-                <select id="p-utility-sel" onchange="document.getElementById('p-utility-val').value=this.value"></select>
-                <input id="p-utility-val" placeholder="Refine Systemic Role...">
+                <div class="lexical-row">
+                    <select id="p-utility-cat" onchange="updateSubList('utility', this.value)"></select>
+                    <select id="p-utility-word" onchange="document.getElementById('p-utility-val').value=this.value"></select>
+                </div>
+                <input id="p-utility-val">
             </div>
         </div>
-        <button style="margin-top:25px; width:100%; padding:12px; background:#005f73; border:none; color:white; font-weight:bold;" onclick="saveAndClose()">Save & Exit</button>
+        <button style="margin-top: 25px; width: 100%; padding: 12px; background: #005f73; border:none; color:white; font-weight:bold;" onclick="saveAndClose()">Save & Exit</button>
     </div>
 </div>
 
@@ -95,37 +105,43 @@
     const Y_SCALE = 60;
 
     const banks = {
-        action: { "Conflict": ["Confronts", "Attacks", "Sabotages"], "Subterfuge": ["Betrays", "Deceives", "Infiltrates"], "Social": ["Negotiates", "Confesses", "Persuades"] },
-        emotions: { "High Energy": ["Euphoria", "Terror", "Rage"], "Low Energy": ["Melancholy", "Dread", "Despair"], "Internal": ["Nostalgia", "Hope", "Shame"] },
-        utility: { "Structural": ["Inciting Incident", "Midpoint Pivot", "Resolution"], "Developmental": ["Character Intro", "Thematic Setup", "World Building"] },
-        immersion: { "Sensory": ["Sulphurous", "Rot-sweet", "Iron-tanged", "Dust-caked"], "Environmental": ["Neon-soaked", "Bleached", "Luminous", "Weatherworn"] }
+        action: { "Conflict": ["Confronts", "Attacks", "Sabotages", "Ambushes"], "Subterfuge": ["Betrays", "Deceives", "Infiltrates", "Eavesdrops"], "Social": ["Negotiates", "Confesses", "Persuades", "Instructs"] },
+        emotions: { "High Energy": ["Euphoria", "Terror", "Rage", "Awe"], "Low Energy": ["Melancholy", "Dread", "Despair", "Nostalgia"], "Internal": ["Shame", "Guilt", "Hope", "Determination"] },
+        utility: { "Structural": ["Inciting Incident", "Midpoint Pivot", "Resolution", "Rising Tension"], "Development": ["Character Intro", "Thematic Setup", "World Building", "Expositional Reveal"] },
+        immersion: { "Sensory": ["Sulphurous", "Rot-sweet", "Iron-tanged", "Dust-caked"], "Environmental": ["Neon-soaked", "Bleached", "Luminous", "Weatherworn", "Echoing"] }
     };
 
     var cy = cytoscape({
         container: document.getElementById('cy'),
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'text-wrap': 'wrap' }},
-            { selector: 'node[type="friction"]', style: { 'width': 35, 'height': 35, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top', 'z-index': 999 }},
+            { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#00d4ff' }},
+            { selector: 'node[type="friction"]', style: { 'width': 35, 'height': 35, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top', 'z-index': 999, 'font-size': '10px' }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }}
         ]
     });
 
-    function populateDropdowns() {
-        for (let key in banks) {
-            const select = document.getElementById(`p-${key}-sel`);
-            select.innerHTML = '<option value="">Select from Family...</option>';
-            for (let group in banks[key]) {
-                let optgroup = document.createElement('optgroup');
-                optgroup.label = group;
-                banks[key][group].forEach(word => {
-                    let opt = document.createElement('option');
-                    opt.value = word;
-                    opt.innerText = word;
-                    optgroup.appendChild(opt);
-                });
-                select.appendChild(optgroup);
-            }
-        }
+    function populateCategories() {
+        ['action', 'emotions', 'utility', 'immersion'].forEach(key => {
+            const catSelect = document.getElementById(`p-${key}-cat`);
+            catSelect.innerHTML = '<option value="">Family...</option>';
+            Object.keys(banks[key]).forEach(cat => {
+                let opt = document.createElement('option');
+                opt.value = cat; opt.innerText = cat;
+                catSelect.appendChild(opt);
+            });
+        });
+    }
+
+    function updateSubList(key, category) {
+        const wordSelect = document.getElementById(`p-${key}-word`);
+        wordSelect.innerHTML = '<option value="">Word...</option>';
+        if (!category) return;
+        banks[key][category].forEach(word => {
+            let opt = document.createElement('option');
+            opt.value = word; opt.innerText = word;
+            wordSelect.appendChild(opt);
+        });
     }
 
     function showCustomPrompt(title, placeholder, callback) {
@@ -151,7 +167,7 @@
             if (sourceNode.id() === n.id()) { openInspector(n); } 
             else {
                 const s = sourceNode;
-                showCustomPrompt("Connection Label", "Enter Action...", (val) => {
+                showCustomPrompt("Connection Action", "Desire or Action...", (val) => {
                     if (val) cy.add({ group: 'edges', data: { source: s.id(), target: n.id(), action: val } });
                 });
             }
@@ -167,37 +183,37 @@
 
     function handleConnectorChoice(choice) {
         const edge = activeEdge;
-        const midX = (edge.source().position('x') + edge.target().position('x')) / 2;
-        const midY = (edge.source().position('y') + edge.target().position('y')) / 2;
-        
-        if (choice === 'N') {
+        // Center of viewport for manual pin placement
+        const pan = cy.pan(); const zoom = cy.zoom();
+        const x = (window.innerWidth / 2 - pan.x) / zoom;
+        const y = (window.innerHeight / 2 - pan.y) / zoom;
+
+        if (choice === 'F') {
+            showCustomPrompt("Friction Label", "e.g. Resistance", (fLab) => {
+                cy.add({ group: 'nodes', data: { id: 'f'+Date.now(), type: "friction", label: fLab || "PIN" }, position: { x: x, y: y } });
+            });
+        } else if (choice === 'N') {
             const midId = 'n' + Date.now();
-            cy.add({ group: 'nodes', data: { id: midId, label: "Complication", score: 0, color: '#444' }, position: { x: midX, y: midY } });
+            cy.add({ group: 'nodes', data: { id: midId, label: "Complication", score: 0, color: '#444' }, position: { x: x, y: y } });
             cy.add([{ group: 'edges', data: { source: edge.source().id(), target: midId, action: "leads to" } }, { group: 'edges', data: { source: midId, target: edge.target().id(), action: edge.data('action') } }]);
             cy.remove(edge);
-        } else if (choice === 'F') {
-            // IMMEDIATE CREATION: Pin data is stored before prompt to ensure focus
-            showCustomPrompt("Friction Label", "e.g., Hidden Doubt", (fLab) => {
-                cy.add({ group: 'nodes', data: { id: 'f'+Date.now(), type: "friction", label: fLab || "PIN" }, position: { x: midX, y: midY } });
-            });
         }
         closeAllModals();
     }
 
     function triggerRename() {
-        showCustomPrompt("Rename Action", "New label...", (val) => { if(val) activeEdge.data('action', val); });
+        showCustomPrompt("Rename Label", "New action text...", (val) => { if(val) activeEdge.data('action', val); });
     }
 
     function openInspector(n) {
         activeNode = n; const d = n.data();
-        populateDropdowns();
+        populateCategories();
         document.getElementById('inspector-popup').style.display = 'block';
         document.querySelector('.overlay').style.display = 'block';
-        ['label', 'score', 'char', 'set', 'action', 'emotions', 'immersion', 'utility'].forEach(f => {
-            let valField = document.getElementById('p-' + f + (['label','score','char','set'].includes(f) ? '' : '-val'));
-            if (f === 'char' || f === 'set') valField.value = (d[f + 'acters'] || d[f + 'tings'] || []).join(', ');
-            else valField.value = d[f] || (f === 'score' ? 0 : '');
-        });
+        ['label', 'score', 'char', 'set'].forEach(f => document.getElementById('p-'+f).value = d[f] || (f==='score'?0:''));
+        ['action', 'emotions', 'immersion', 'utility'].forEach(f => document.getElementById('p-'+f+'-val').value = d[f] || '');
+        document.getElementById('p-char').value = (d.characters || []).join(', ');
+        document.getElementById('p-set').value = (d.settings || []).join(', ');
     }
 
     function saveAndClose() {
@@ -226,10 +242,7 @@
             for (let name in registry[type]) {
                 const item = registry[type][name];
                 html += `<div class="registry-item"><strong>${name}</strong>
-                    <div style="display:flex; gap:5px; margin:5px 0;">
-                        <input placeholder="Hybrid A" value="${item.h1||''}" onchange="registry.${type}['${name}'].h1=this.value; refreshRegistry()">
-                        <input placeholder="Hybrid B" value="${item.h2||''}" onchange="registry.${type}['${name}'].h2=this.value; refreshRegistry()">
-                    </div>
+                    <div style="display:flex; gap:5px; margin:5px 0;"><input placeholder="Hybrid A" value="${item.h1||''}" onchange="registry.${type}['${name}'].h1=this.value; refreshRegistry()"><input placeholder="Hybrid B" value="${item.h2||''}" onchange="registry.${type}['${name}'].h2=this.value; refreshRegistry()"></div>
                     <textarea placeholder="Descriptor..." onchange="registry.${type}['${name}'].desc=this.value">${item.desc||''}</textarea>
                 </div>`;
             }
@@ -239,7 +252,7 @@
 
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
     function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; if(sourceNode) sourceNode.unselect(); sourceNode = null; }
-    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v28.json"; a.click(); }
+    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v30.json"; a.click(); }
     function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
 </body>
