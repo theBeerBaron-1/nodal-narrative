@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v19</title>
+    <title>Narrative Systems Engine v20</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -16,9 +16,9 @@
         input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; }
         label { font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 12px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
-        .wheel-container { position: fixed; top: 10%; right: 400px; width: 280px; background: #1a1a1a; border: 2px solid #00d4ff; z-index: 1002; display: none; padding: 15px; border-radius: 12px; max-height: 70vh; overflow-y: auto; box-shadow: 0 0 20px #00d4ff; }
-        .wheel-item { width: 100%; text-align: left; margin: 3px 0; background: #222; border: 1px solid #444; color: #eee; padding: 8px; border-radius: 4px; cursor: pointer; }
-        .wheel-item:hover { border-color: #00d4ff; background: #2a2a2a; }
+        .wheel-container { position: fixed; top: 10%; right: 400px; width: 300px; background: #1a1a1a; border: 2px solid #00d4ff; z-index: 1002; display: none; padding: 15px; border-radius: 12px; max-height: 70vh; overflow-y: auto; }
+        .cat-btn { width: 100%; background: #005f73; color: white; margin: 5px 0; text-align: left; padding: 8px; font-weight: bold; }
+        .wheel-item { width: 100%; text-align: left; margin: 2px 0; background: #222; border: 1px solid #444; color: #eee; padding: 8px; border-radius: 4px; cursor: pointer; display: none; }
     </style>
 </head>
 <body>
@@ -28,7 +28,7 @@
 <div id="main-wrapper">
     <div class="controls">
         <button onclick="addNode()">+ New Scene</button>
-        <button onclick="autoBalance()">Auto-Balance Map</button>
+        <button onclick="autoBalance()">Auto-Balance Arc</button>
         <button onclick="exportAll()">Export JSON</button>
         <button onclick="document.getElementById('importFile').click()">Import JSON</button>
         <input type="file" id="importFile" style="display:none" onchange="importAll(event)">
@@ -36,7 +36,7 @@
     <div id="cy"></div>
 
     <div id="lexical-wheel" class="wheel-container">
-        <h4 id="wheel-title" style="margin:0 0 10px 0; color:#00d4ff; text-align:center;">Lexical Wheel</h4>
+        <h4 id="wheel-title" style="margin:0 0 10px 0; color:#00d4ff; text-align:center;">Lexical Family</h4>
         <div id="wheel-content"></div>
     </div>
 
@@ -52,11 +52,10 @@
                 </div>
             </div>
             <div>
-                <label>Action <button onclick="toggleWheel('action')">🔍 Wheel</button></label><input id="p-action">
-                <label>Emotions <button onclick="toggleWheel('emotions')">🔍 Wheel</button></label><input id="p-emotions">
-                <label>Immersion <button onclick="toggleWheel('immersion')">🔍 Wheel</button></label><input id="p-immersion">
-                <label>Utility <button onclick="toggleWheel('utility')">🔍 Wheel</button></label><input id="p-utility">
-                <label>Obstacle</label><input id="p-obstacle">
+                <label>Action <button onclick="toggleWheel('action')">🔍 Family</button></label><input id="p-action">
+                <label>Emotions <button onclick="toggleWheel('emotions')">🔍 Family</button></label><input id="p-emotions">
+                <label>Immersion <button onclick="toggleWheel('immersion')">🔍 Family</button></label><input id="p-immersion">
+                <label>Utility <button onclick="toggleWheel('utility')">🔍 Family</button></label><input id="p-utility">
             </div>
         </div>
         <button style="margin-top: 25px; width: 100%; padding: 12px; background: #005f73; border:none; color:white; font-weight:bold;" onclick="saveAndClose()">Save & Exit</button>
@@ -66,16 +65,30 @@
 <div id="registry-panel"><h3 style="color: #00d4ff; margin-top: 0;">World Registry</h3><div id="registry-content"></div></div>
 
 <script>
-    let activeNode = null;
-    let sourceNode = null;
-    let registry = { characters: {}, settings: {} };
+    let activeNode = null, sourceNode = null, registry = { characters: {}, settings: {} };
     const Y_SCALE = 60;
 
     const banks = {
-        utility: ["Introduces Character", "Establishes Setting", "Inciting Incident", "World Building", "Characterisation Shift", "Problem Escalation", "Rising Tension", "Midpoint Pivot", "Resolution"],
-        action: ["Confronts", "Betrays", "Escapes", "Discovers", "Negotiates", "Rescues", "Sacrifices", "Sabotages", "Ambushes", "Deceives"],
-        emotions: ["Melancholy", "Euphoria", "Resentment", "Dread", "Anticipation", "Nostalgia", "Despair", "Hope", "Terror", "Gratitude"],
-        immersion: ["Sulphurous", "Bleached", "Rot-sweet", "Airless", "Luminous", "Neon-soaked", "Iron-tanged", "Velvet-dark", "Salt-sprayed", "Ancient", "Glistening"]
+        action: {
+            "External Conflict": ["Confronts", "Attacks", "Sabotages", "Rescues"],
+            "Subterfuge": ["Betrays", "Deceives", "Infiltrates", "Eavesdrops"],
+            "Social/Diplomatic": ["Negotiates", "Consults", "Confesses", "Persuades"]
+        },
+        emotions: {
+            "Positive": ["Euphoria", "Hope", "Gratitude", "Determination"],
+            "Negative": ["Dread", "Despair", "Resentment", "Shame"],
+            "Complex": ["Melancholy", "Nostalgia", "Anticipation", "Awe"]
+        },
+        immersion: {
+            "Atmospheric": ["Sulphurous", "Luminous", "Neon-soaked", "Ancient"],
+            "Tactile": ["Rot-sweet", "Iron-tanged", "Velvet-dark", "Salt-sprayed"],
+            "Liminal": ["Glistening", "Bleached", "Airless", "Echoing"]
+        },
+        utility: {
+            "Structural": ["Inciting Incident", "Midpoint Pivot", "Climax", "Resolution"],
+            "Development": ["Introduces Character", "Characterisation Shift", "Thematic Setup"],
+            "World": ["Establishes Setting", "World Building", "Expositional Reveal"]
+        }
     };
 
     var cy = cytoscape({
@@ -83,26 +96,23 @@
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px' }},
             { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#00d4ff' }},
-            { selector: 'node[type="friction"]', style: { 'width': 25, 'height': 25, 'background-color': '#ff4500', 'shape': 'diamond', 'label': '' }},
+            { selector: 'node[type="friction"]', style: { 'width': 30, 'height': 30, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top' }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }}
         ]
     });
 
     function addNode() {
         const id = 'n' + Date.now();
-        cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444', characters: [], settings: [] }, position: { x: (cy.nodes().length * 200) + 100, y: window.innerHeight/2 } });
-        refreshRegistry();
+        const xPos = (cy.nodes().length * 220) + 100;
+        cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444' }, position: { x: xPos, y: window.innerHeight/2 } });
     }
 
     cy.on('tap', 'node', function(evt){
         let n = evt.target;
-        if (!sourceNode) { 
-            sourceNode = n; 
-            n.select(); // Restored Highlight Halo
-        } else {
-            if (sourceNode.id() === n.id()) { 
-                openInspector(n); 
-            } else {
+        if (!sourceNode) { sourceNode = n; n.select(); } 
+        else {
+            if (sourceNode.id() === n.id()) { openInspector(n); } 
+            else {
                 let act = prompt("Connection Action:");
                 if (act) cy.add({ group: 'edges', data: { source: sourceNode.id(), target: n.id(), action: act } });
             }
@@ -119,63 +129,83 @@
             cy.add([{ group: 'edges', data: { source: edge.source().id(), target: midId, action: "leads to" } }, { group: 'edges', data: { source: midId, target: edge.target().id(), action: edge.data('action') } }]);
             cy.remove(edge);
         } else if (choice?.toUpperCase() === 'F') {
+            let label = prompt("Friction Label:");
             const fId = 'f' + Date.now();
-            // Calculation for true midpoint to ensure dissection look
             const midX = (edge.source().position('x') + edge.target().position('x')) / 2;
             const midY = (edge.source().position('y') + edge.target().position('y')) / 2;
-            cy.add({ group: 'nodes', data: { id: fId, type: "friction" }, position: { x: midX, y: midY } });
+            cy.add({ group: 'nodes', data: { id: fId, type: "friction", label: label || "PIN" }, position: { x: midX, y: midY } });
+            edge.data('hasFriction', true);
         }
     });
 
     function toggleWheel(key) {
-        const wheel = document.getElementById('lexical-wheel');
-        const content = document.getElementById('wheel-content');
-        document.getElementById('wheel-title').innerText = key.toUpperCase();
-        content.innerHTML = banks[key].map(word => `<button class="wheel-item" onclick="selectWord('${key}','${word}')">${word}</button>`).join('');
+        const wheel = document.getElementById('lexical-wheel'), content = document.getElementById('wheel-content');
+        content.innerHTML = '';
+        for (let category in banks[key]) {
+            content.innerHTML += `<button class="cat-btn" onclick="toggleCat(this)">${category}</button>`;
+            banks[key][category].forEach(word => {
+                content.innerHTML += `<button class="wheel-item" onclick="selectWord('${key}','${word}')">${word}</button>`;
+            });
+        }
         wheel.style.display = 'block';
     }
 
-    function selectWord(key, word) {
-        document.getElementById('p-' + key).value = word;
-        document.getElementById('lexical-wheel').style.display = 'none';
+    function toggleCat(btn) {
+        let sibling = btn.nextElementSibling;
+        while (sibling && sibling.className === 'wheel-item') {
+            sibling.style.display = sibling.style.display === 'block' ? 'none' : 'block';
+            sibling = sibling.nextElementSibling;
+        }
+    }
+
+    function selectWord(key, word) { document.getElementById('p-' + key).value = word; document.getElementById('lexical-wheel').style.display = 'none'; }
+
+    function autoBalance() {
+        cy.layout({
+            name: 'cose', animate: true, nodeOverlap: 50,
+            stop: function() {
+                cy.nodes().forEach(n => {
+                    if (n.data('type') !== 'friction') {
+                        n.position('y', (window.innerHeight/2) - (n.data('score') * Y_SCALE));
+                    }
+                    // Resistance Drag: Push targets of friction further right
+                    cy.edges().forEach(e => {
+                        if (e.data('hasFriction')) {
+                            e.target().position('x', e.target().position('x') + 100);
+                        }
+                    });
+                });
+            }
+        }).run();
     }
 
     function saveAndClose() {
         if (!activeNode) return;
-        const score = document.getElementById('p-score').value;
-        const chars = document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s);
-        const sets = document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s);
-        activeNode.data({
-            label: document.getElementById('p-label').value, score: score,
-            characters: chars, settings: sets,
-            action: document.getElementById('p-action').value,
-            emotions: document.getElementById('p-emotions').value,
-            immersion: document.getElementById('p-immersion').value,
-            utility: document.getElementById('p-utility').value,
-            obstacle: document.getElementById('p-obstacle').value,
-            color: nPos(score)
-        });
-        activeNode.position('y', (window.innerHeight/2) - (score * Y_SCALE));
-        chars.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { desc: '' }; });
-        sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { desc: '' }; });
+        const d = {
+            label: document.getElementById('p-label').value, score: document.getElementById('p-score').value,
+            characters: document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s),
+            settings: document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s),
+            action: document.getElementById('p-action').value, emotions: document.getElementById('p-emotions').value,
+            immersion: document.getElementById('p-immersion').value, utility: document.getElementById('p-utility').value,
+            color: nPos(document.getElementById('p-score').value)
+        };
+        activeNode.data(d);
+        activeNode.position('y', (window.innerHeight/2) - (d.score * Y_SCALE));
+        d.characters.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { desc: '' }; });
+        d.settings.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { desc: '' }; });
         refreshRegistry();
         closeInspector();
     }
 
-    function openInspector(node) {
-        activeNode = node;
-        const d = node.data();
+    function openInspector(n) {
+        activeNode = n; const d = n.data();
         document.querySelector('.overlay').style.display = 'block';
         document.getElementById('inspector-popup').style.display = 'block';
-        document.getElementById('p-label').value = d.label || '';
-        document.getElementById('p-score').value = d.score || 0;
-        document.getElementById('p-char').value = (d.characters || []).join(', ');
-        document.getElementById('p-set').value = (d.settings || []).join(', ');
-        document.getElementById('p-action').value = d.action || '';
-        document.getElementById('p-emotions').value = d.emotions || '';
-        document.getElementById('p-immersion').value = d.immersion || '';
-        document.getElementById('p-utility').value = d.utility || '';
-        document.getElementById('p-obstacle').value = d.obstacle || '';
+        ['label', 'score', 'char', 'set', 'action', 'emotions', 'immersion', 'utility'].forEach(f => {
+            let el = document.getElementById('p-' + f);
+            if (f === 'char' || f === 'set') el.value = (d[f + 'acters'] || d[f + 'tings'] || []).join(', ');
+            else el.value = d[f] || '';
+        });
     }
 
     function refreshRegistry() {
