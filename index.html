@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v31</title>
+    <title>Narrative Systems Engine v32</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
         #main-wrapper { display: flex; flex-grow: 1; flex-direction: column; position: relative; }
         #cy { flex-grow: 1; background: #0f0f0f; }
         #registry-panel { width: 420px; background: #151515; border-left: 1px solid #333; padding: 20px; overflow-y: auto; }
-        .registry-item { background: #222; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #00d4ff; cursor: pointer; transition: 0.2s; }
-        .registry-item:hover { background: #2a2a2a; border-left-color: #fff; }
-        .registry-item.active-lens { border-left-width: 8px; background: #003a47; }
+        .registry-item { background: #222; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #00d4ff; cursor: pointer; }
+        .registry-item:hover { background: #2a2a2a; }
+        .registry-item.active-lens { border-left-color: #fff; background: #005f73; box-shadow: 0 0 15px #00d4ff; }
         
         .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 3000; box-shadow: 0 0 60px #000; width: 450px; }
         #inspector-popup { width: 850px; z-index: 2000; }
@@ -21,7 +21,6 @@
         input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; font-family: inherit; }
         label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 12px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
-        .lexical-row { display: flex; gap: 5px; align-items: center; }
     </style>
 </head>
 <body>
@@ -51,7 +50,7 @@
         <button onclick="exportDeep()">Export JSON</button>
         <button onclick="document.getElementById('importFile').click()">Import JSON</button>
         <input type="file" id="importFile" style="display:none" onchange="importDeep(event)">
-        <button onclick="clearHighlights()" style="border-color:#600">Clear Highlights</button>
+        <button onclick="clearHighlights()" style="background:#600; border-color:#f00;">RESET VIEW</button>
     </div>
     <div id="cy"></div>
 
@@ -61,34 +60,14 @@
             <div>
                 <label>Scene Label</label><input id="p-label">
                 <label>Emotional Score (-10 to 10)</label><input type="number" id="p-score">
-                <label>Characters (Comma separated)</label><input id="p-char">
-                <label>Settings (Comma separated)</label><input id="p-set">
+                <label>Characters</label><input id="p-char">
+                <label>Settings</label><input id="p-set">
             </div>
             <div>
-                <label>Action Family</label>
-                <div class="lexical-row">
-                    <select id="p-action-cat" onchange="updateSubList('action', this.value)"></select>
-                    <select id="p-action-word" onchange="document.getElementById('p-action-val').value=this.value"></select>
-                </div>
-                <input id="p-action-val">
-                <label>Emotions Family</label>
-                <div class="lexical-row">
-                    <select id="p-emotions-cat" onchange="updateSubList('emotions', this.value)"></select>
-                    <select id="p-emotions-word" onchange="document.getElementById('p-emotions-val').value=this.value"></select>
-                </div>
-                <input id="p-emotions-val">
-                <label>Immersion</label>
-                <div class="lexical-row">
-                    <select id="p-immersion-cat" onchange="updateSubList('immersion', this.value)"></select>
-                    <select id="p-immersion-word" onchange="document.getElementById('p-immersion-val').value=this.value"></select>
-                </div>
-                <input id="p-immersion-val">
-                <label>Utility</label>
-                <div class="lexical-row">
-                    <select id="p-utility-cat" onchange="updateSubList('utility', this.value)"></select>
-                    <select id="p-utility-word" onchange="document.getElementById('p-utility-val').value=this.value"></select>
-                </div>
-                <input id="p-utility-val">
+                <label>Action</label><input id="p-action">
+                <label>Emotions</label><input id="p-emotions">
+                <label>Immersion</label><input id="p-immersion">
+                <label>Utility</label><input id="p-utility">
             </div>
         </div>
         <button style="margin-top: 25px; width: 100%; padding: 12px; background: #005f73; border:none; color:white; font-weight:bold;" onclick="saveAndClose()">Save & Exit</button>
@@ -99,46 +78,18 @@
 
 <script>
     let activeNode = null, sourceNode = null, activeEdge = null, registry = { characters: {}, settings: {} };
-    let currentLens = { type: null, name: null };
+    let lensMode = { type: null, name: null };
     const Y_SCALE = 60;
-
-    const banks = {
-        action: { "Conflict": ["Confronts", "Attacks", "Sabotages"], "Subterfuge": ["Betrays", "Deceives", "Infiltrates"], "Social": ["Negotiates", "Confesses", "Persuades"] },
-        emotions: { "High": ["Euphoria", "Terror", "Rage"], "Low": ["Melancholy", "Dread", "Despair"], "Internal": ["Nostalgia", "Hope", "Shame"] },
-        utility: { "Structural": ["Inciting Incident", "Midpoint Pivot", "Resolution"], "Developmental": ["Character Intro", "Thematic Setup", "World Building"] },
-        immersion: { "Sensory": ["Sulphurous", "Rot-sweet", "Iron-tanged"], "Visual": ["Neon-soaked", "Bleached", "Luminous"] }
-    };
 
     var cy = cytoscape({
         container: document.getElementById('cy'),
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'text-wrap': 'wrap' }},
-            { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#fff' }},
             { selector: 'node[type="friction"]', style: { 'width': 35, 'height': 35, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top', 'z-index': 999 }},
-            { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }}
+            { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }},
+            { selector: '.ghost', style: { 'opacity': 0.05, 'text-opacity': 0 }}
         ]
     });
-
-    function populateCategories() {
-        ['action', 'emotions', 'utility', 'immersion'].forEach(key => {
-            const catSelect = document.getElementById(`p-${key}-cat`);
-            catSelect.innerHTML = '<option value="">Family...</option>';
-            Object.keys(banks[key]).forEach(cat => {
-                let opt = document.createElement('option');
-                opt.value = cat; opt.innerText = cat; catSelect.appendChild(opt);
-            });
-        });
-    }
-
-    function updateSubList(key, category) {
-        const wordSelect = document.getElementById(`p-${key}-word`);
-        wordSelect.innerHTML = '<option value="">Word...</option>';
-        if (!category) return;
-        banks[key][category].forEach(word => {
-            let opt = document.createElement('option');
-            opt.value = word; opt.innerText = word; wordSelect.appendChild(opt);
-        });
-    }
 
     function showCustomPrompt(title, placeholder, callback) {
         document.querySelector('.overlay').style.display = 'block';
@@ -158,8 +109,10 @@
     cy.on('tap', 'node', function(evt){
         let n = evt.target;
         if (n.data('type') === 'friction') return;
-        if (!sourceNode) { sourceNode = n; n.select(); } 
-        else {
+        if (!sourceNode) { 
+            sourceNode = n; 
+            n.style({'border-width': 4, 'border-color': '#fff'});
+        } else {
             if (sourceNode.id() === n.id()) { openInspector(n); } 
             else {
                 const s = sourceNode;
@@ -167,7 +120,8 @@
                     if (val) cy.add({ group: 'edges', data: { source: s.id(), target: n.id(), action: val } });
                 });
             }
-            sourceNode.unselect(); sourceNode = null;
+            sourceNode.style({'border-width': 0});
+            sourceNode = null;
         }
     });
 
@@ -182,9 +136,8 @@
         const p = cy.pan(); const z = cy.zoom();
         const x = (window.innerWidth/2 - p.x)/z;
         const y = (window.innerHeight/2 - p.y)/z;
-
         if (choice === 'F') {
-            showCustomPrompt("Friction Label", "e.g. Resistance", (fLab) => {
+            showCustomPrompt("Friction Label", "e.g. Doubt", (fLab) => {
                 cy.add({ group: 'nodes', data: { id: 'f'+Date.now(), type: "friction", label: fLab || "PIN" }, position: { x: x, y: y } });
             });
         } else if (choice === 'N') {
@@ -202,33 +155,57 @@
 
     function openInspector(n) {
         activeNode = n; const d = n.data();
-        populateCategories();
         document.getElementById('inspector-popup').style.display = 'block';
         document.querySelector('.overlay').style.display = 'block';
-        ['label', 'score', 'char', 'set'].forEach(f => document.getElementById('p-'+f).value = d[f] || (f==='score'?0:''));
-        ['action', 'emotions', 'immersion', 'utility'].forEach(f => document.getElementById('p-'+f+'-val').value = d[f] || '');
-        document.getElementById('p-char').value = (d.characters || []).join(', ');
-        document.getElementById('p-set').value = (d.settings || []).join(', ');
+        ['label', 'score', 'char', 'set', 'action', 'emotions', 'immersion', 'utility'].forEach(f => {
+            let el = document.getElementById('p-' + f);
+            if (f === 'char' || f === 'set') el.value = (d[f + 'acters'] || d[f + 'tings'] || []).join(', ');
+            else el.value = d[f] || (f==='score'?0:'');
+        });
     }
 
     function saveAndClose() {
+        if (!activeNode) return;
         const score = document.getElementById('p-score').value;
         const chars = document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s);
         const sets = document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s);
         activeNode.data({
             label: document.getElementById('p-label').value, score: score,
             characters: chars, settings: sets,
-            action: document.getElementById('p-action-val').value,
-            emotions: document.getElementById('p-emotions-val').value,
-            immersion: document.getElementById('p-immersion-val').value,
-            utility: document.getElementById('p-utility-val').value,
+            action: document.getElementById('p-action').value,
+            emotions: document.getElementById('p-emotions').value,
+            immersion: document.getElementById('p-immersion').value,
+            utility: document.getElementById('p-utility').value,
             color: nPos(score)
         });
         activeNode.position('y', (window.innerHeight/2) - (score * Y_SCALE));
         chars.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { h1: '', h2: '', desc: '' }; });
         sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { h1: '', h2: '', desc: '' }; });
         refreshRegistry(); closeAllModals();
-        if (currentLens.name) applyLens(currentLens.type, currentLens.name);
+        if(lensMode.name) applyLens(lensMode.type, lensMode.name);
+    }
+
+    function applyLens(type, name) {
+        lensMode = { type: type, name: name };
+        const dataKey = type === 'characters' ? 'characters' : 'settings';
+        
+        cy.elements().addClass('ghost');
+        const matches = cy.nodes().filter(n => (n.data(dataKey) || []).includes(name));
+        matches.removeClass('ghost');
+
+        cy.edges().forEach(e => {
+            const hasS = (e.source().data(dataKey) || []).includes(name);
+            const hasT = (e.target().data(dataKey) || []).includes(name);
+            if (hasS && hasT) e.removeClass('ghost').style({'line-color': '#00d4ff', 'width': 6});
+            else e.style({'line-color': '#333', 'width': 4});
+        });
+        refreshRegistry();
+    }
+
+    function clearHighlights() {
+        lensMode = { type: null, name: null };
+        cy.elements().removeClass('ghost').style({'line-color': '#333', 'width': 4, 'opacity': 1});
+        refreshRegistry();
     }
 
     function refreshRegistry() {
@@ -236,52 +213,23 @@
         ['characters', 'settings'].forEach(type => {
             html += `<h4 style="color:#00d4ff; margin-bottom:5px;">${type.toUpperCase()}</h4>`;
             for (let name in registry[type]) {
-                const item = registry[type][name];
-                const isActive = (currentLens.type === type && currentLens.name === name) ? 'active-lens' : '';
-                html += `<div class="registry-item ${isActive}" onclick="applyLens('${type}', '${name}')">
+                const active = (lensMode.type === type && lensMode.name === name) ? 'active-lens' : '';
+                html += `<div class="registry-item ${active}" onclick="applyLens('${type}', '${name}')">
                     <strong>${name}</strong>
                     <div style="display:flex; gap:5px; margin:5px 0;" onclick="event.stopPropagation()">
-                        <input placeholder="Hybrid A" value="${item.h1||''}" onchange="registry.${type}['${name}'].h1=this.value; refreshRegistry()">
-                        <input placeholder="Hybrid B" value="${item.h2||''}" onchange="registry.${type}['${name}'].h2=this.value; refreshRegistry()">
+                        <input placeholder="Hybrid A" value="${registry[type][name].h1||''}" onchange="registry.${type}['${name}'].h1=this.value; refreshRegistry()">
+                        <input placeholder="Hybrid B" value="${registry[type][name].h2||''}" onchange="registry.${type}['${name}'].h2=this.value; refreshRegistry()">
                     </div>
-                    <textarea placeholder="Descriptor..." onclick="event.stopPropagation()" onchange="registry.${type}['${name}'].desc=this.value">${item.desc||''}</textarea>
+                    <textarea placeholder="Descriptor..." onclick="event.stopPropagation()" onchange="registry.${type}['${name}'].desc=this.value">${registry[type][name].desc||''}</textarea>
                 </div>`;
             }
         });
         document.getElementById('registry-content').innerHTML = html;
     }
 
-    function applyLens(type, name) {
-        currentLens = { type: type, name: name };
-        const dataKey = type === 'characters' ? 'characters' : 'settings';
-        
-        cy.elements().style('opacity', 0.1);
-        cy.nodes('[type="friction"]').style('opacity', 0.8); // Pins stay visible for context
-
-        const matchingNodes = cy.nodes().filter(n => (n.data(dataKey) || []).includes(name));
-        matchingNodes.style('opacity', 1);
-
-        cy.edges().forEach(edge => {
-            const hasInSource = (edge.source().data(dataKey) || []).includes(name);
-            const hasInTarget = (edge.target().data(dataKey) || []).includes(name);
-            if (hasInSource && hasInTarget) {
-                edge.style({ 'opacity': 1, 'line-color': '#00d4ff', 'width': 6 });
-            } else {
-                edge.style({ 'line-color': '#333', 'width': 4 });
-            }
-        });
-        refreshRegistry();
-    }
-
-    function clearHighlights() {
-        currentLens = { type: null, name: null };
-        cy.elements().style({ 'opacity': 1, 'line-color': '#333', 'width': 4 });
-        refreshRegistry();
-    }
-
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
-    function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; if(sourceNode) sourceNode.unselect(); sourceNode = null; }
-    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v31.json"; a.click(); }
+    function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; }
+    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v32.json"; a.click(); }
     function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
 </body>
