@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v33</title>
+    <title>Narrative Systems Engine v34</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -20,6 +20,10 @@
         input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; font-family: inherit; }
         label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 12px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
+        
+        /* Category Word Wheel Styling */
+        optgroup { background: #111; color: #00d4ff; font-style: normal; }
+        option { color: #fff; }
     </style>
 </head>
 <body>
@@ -63,10 +67,21 @@
                 <label>Settings</label><input id="p-set">
             </div>
             <div>
-                <label>Action</label><input id="p-action">
-                <label>Emotions</label><input id="p-emotions">
-                <label>Immersion</label><input id="p-immersion">
-                <label>Utility</label><input id="p-utility">
+                <label>Action Family</label>
+                <select id="p-action-wheel" onchange="document.getElementById('p-action').value=this.value"></select>
+                <input id="p-action" placeholder="Refine Action...">
+
+                <label>Emotions Family</label>
+                <select id="p-emotions-wheel" onchange="document.getElementById('p-emotions').value=this.value"></select>
+                <input id="p-emotions" placeholder="Refine Emotion...">
+
+                <label>Immersion (Sensory)</label>
+                <select id="p-immersion-wheel" onchange="document.getElementById('p-immersion').value=this.value"></select>
+                <input id="p-immersion" placeholder="Refine Sensory Detail...">
+
+                <label>Utility</label>
+                <select id="p-utility-wheel" onchange="document.getElementById('p-utility').value=this.value"></select>
+                <input id="p-utility" placeholder="Refine Systemic Role...">
             </div>
         </div>
         <button style="margin-top: 25px; width: 100%; padding: 12px; background: #005f73; border:none; color:white; font-weight:bold;" onclick="saveAndClose()">Save & Exit</button>
@@ -80,17 +95,41 @@
     let lensMode = { type: null, name: null };
     const Y_SCALE = 60;
 
+    const families = {
+        action: { "Conflict": ["Confronts", "Attacks", "Sabotages"], "Social": ["Negotiates", "Confesses", "Persuades"], "Discovery": ["Discovers", "Infiltrates", "Explores"] },
+        emotions: { "High Energy": ["Euphoria", "Terror", "Rage"], "Low Energy": ["Melancholy", "Dread", "Despair"], "Reflective": ["Nostalgia", "Hope", "Awe"] },
+        utility: { "Structure": ["Inciting Incident", "Midpoint Pivot", "Resolution"], "Development": ["Character Intro", "Thematic Setup", "World Building"] },
+        immersion: { "Sensory": ["Sulphurous", "Rot-sweet", "Iron-tanged"], "Visual": ["Neon-soaked", "Bleached", "Luminous"] }
+    };
+
     var cy = cytoscape({
         container: document.getElementById('cy'),
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'text-wrap': 'wrap' }},
             { selector: 'node[type="friction"]', style: { 'width': 30, 'height': 30, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top', 'z-index': 999 }},
-            { selector: 'node[type="midpoint"]', style: { 'width': 5, 'height': 5, 'background-color': '#00d4ff', 'label': '' }},
+            { selector: 'node[type="midpoint"]', style: { 'width': 5, 'height': 5, 'background-color': '#00d4ff', 'opacity': 0.8 }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }},
-            { selector: 'edge[type="needle"]', style: { 'width': 2, 'line-color': '#ff4500', 'line-style': 'dashed', 'target-arrow-shape': 'none', 'label': '' }},
+            { selector: 'edge[type="needle"]', style: { 'width': 2, 'line-color': '#ff4500', 'line-style': 'dashed', 'target-arrow-shape': 'none' }},
             { selector: '.ghost', style: { 'opacity': 0.05, 'text-opacity': 0 }}
         ]
     });
+
+    function populateWheels() {
+        ['action', 'emotions', 'immersion', 'utility'].forEach(key => {
+            const select = document.getElementById(`p-${key}-wheel`);
+            select.innerHTML = '<option value="">Select from Family...</option>';
+            for (let group in families[key]) {
+                let optgroup = document.createElement('optgroup');
+                optgroup.label = group;
+                families[key][group].forEach(word => {
+                    let opt = document.createElement('option');
+                    opt.value = word; opt.innerText = word;
+                    optgroup.appendChild(opt);
+                });
+                select.appendChild(optgroup);
+            }
+        });
+    }
 
     function showCustomPrompt(title, placeholder, callback) {
         document.querySelector('.overlay').style.display = 'block';
@@ -141,27 +180,23 @@
 
         if (choice === 'F') {
             showCustomPrompt("Friction Label", "e.g. Resistance", (fLab) => {
-                const midNodeId = 'm' + Date.now();
+                const midNodeId = 'mid' + Date.now();
                 const pinId = 'f' + Date.now();
                 
-                // 1. Create invisible midpoint anchor on the line
                 cy.add({ group: 'nodes', data: { id: midNodeId, type: 'midpoint' }, position: { x: midX, y: midY } });
                 
-                // 2. Calculate perpendicular offset
                 const dx = tPos.x - sPos.x;
                 const dy = tPos.y - sPos.y;
-                const len = Math.sqrt(dx*dx + dy*dy);
+                const len = Math.sqrt(dx*dx + dy*dy) || 1;
                 const nx = -dy / len;
                 const ny = dx / len;
                 
-                // 3. Create the pin equidistant/perpendicular
                 cy.add({ 
                     group: 'nodes', 
                     data: { id: pinId, type: "friction", label: fLab || "PIN" }, 
                     position: { x: midX + (nx * 60), y: midY + (ny * 60) } 
                 });
                 
-                // 4. Connect with needle
                 cy.add({ group: 'edges', data: { source: midNodeId, target: pinId, type: 'needle' } });
             });
         } else if (choice === 'N') {
@@ -179,6 +214,7 @@
 
     function openInspector(n) {
         activeNode = n; const d = n.data();
+        populateWheels();
         document.getElementById('inspector-popup').style.display = 'block';
         document.querySelector('.overlay').style.display = 'block';
         ['label', 'score', 'char', 'set', 'action', 'emotions', 'immersion', 'utility'].forEach(f => {
@@ -227,12 +263,12 @@
 
     function clearHighlights() {
         lensMode = { type: null, name: null };
-        cy.elements().removeClass('ghost');
-        // Critical: Restore hard dimensions to prevent ellipse warping
-        cy.nodes().style({ 'width': 80, 'height': 80, 'opacity': 1 });
-        cy.nodes('[type="friction"]').style({ 'width': 30, 'height': 30 });
-        cy.nodes('[type="midpoint"]').style({ 'width': 5, 'height': 5 });
-        cy.edges().style({'line-color': '#333', 'width': 4, 'opacity': 1});
+        cy.elements().removeClass('ghost').style({
+            'opacity': 1, 'width': 4, 'line-color': '#333', 'text-opacity': 1
+        });
+        cy.nodes().style({'width': 80, 'height': 80});
+        cy.nodes('[type="friction"]').style({'width': 30, 'height': 30});
+        cy.nodes('[type="midpoint"]').style({'width': 5, 'height': 5});
         refreshRegistry();
     }
 
@@ -257,7 +293,7 @@
 
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
     function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; }
-    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v33.json"; a.click(); }
+    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v34.json"; a.click(); }
     function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
 </body>
