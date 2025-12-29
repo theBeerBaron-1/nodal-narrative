@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v43</title>
+    <title>Narrative Systems Engine v44</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -11,19 +11,29 @@
         .registry-item { background: #222; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #00d4ff; cursor: pointer; transition: 0.2s; }
         .registry-item.active-lens { border-left-color: #fff; background: #005f73; box-shadow: 0 0 15px #00d4ff; }
         .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 3000; box-shadow: 0 0 60px #000; width: 450px; }
-        #inspector-popup { width: 500px; z-index: 2000; max-height: 90vh; overflow-y: auto; }
+        
+        /* Expanded Inspector for Two-Column Layout */
+        #inspector-popup { width: 850px; z-index: 2000; max-height: 90vh; overflow-y: auto; }
+        .inspector-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 30px; }
+        
         .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 10px; border-radius: 8px; border: 1px solid #333; }
         button { cursor: pointer; padding: 6px 12px; margin: 2px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 11px; }
         input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; font-family: inherit; }
         label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 12px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
+        
         .aeiou-row { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 2px; }
         .icon-trigger { cursor: pointer; background: #333; border: 1px solid #555; border-radius: 4px; padding: 8px; font-size: 14px; transition: 0.2s; display: flex; align-items: center; justify-content: center; min-width: 38px; height: 35px; }
         .icon-trigger:hover { background: #00d4ff; color: #000; }
+        
         #precision-menu { position: absolute; background: #1a1a1a; border: 1px solid #00d4ff; border-radius: 4px; z-index: 4000; display: none; max-height: 300px; overflow-y: auto; width: 180px; box-shadow: 0 5px 20px #000; }
         .menu-item { padding: 8px 12px; cursor: pointer; font-size: 12px; border-bottom: 1px solid #333; }
         .menu-item:hover { background: #005f73; }
         .menu-header { font-size: 9px; color: #00d4ff; padding: 4px 12px; background: #111; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Highlight Classes */
+        .ghost { opacity: 0.1 !important; pointer-events: none; }
+        .lens-highlight { opacity: 1 !important; border-width: 6px !important; border-color: #00d4ff !important; line-color: #00d4ff !important; width: 6px !important; }
     </style>
 </head>
 <body>
@@ -59,29 +69,32 @@
     <div id="cy"></div>
 
     <div id="inspector-popup" class="custom-modal">
-        <h3 style="margin: 0 0 15px 0; color: #00d4ff;">SCENE FOCUS (AEIOU)</h3>
-        
-        <label>Scene Label</label><input id="p-label">
-        <label>Emotional Score (-10 to 10)</label><input type="number" id="p-score">
+        <h3 style="margin: 0 0 15px 0; color: #00d4ff;">SCENE FOCUS</h3>
+        <div class="inspector-grid">
+            <div>
+                <label>Scene Label</label><input id="p-label">
+                <label>Emotional Score (-10 to 10)</label><input id="p-score" type="number">
+                <label>Characters</label><input id="p-char">
+                <label>Settings</label><input id="p-set">
+            </div>
+            
+            <div>
+                <label>Action (A)</label>
+                <div class="aeiou-row"><input id="f-action"><div class="icon-trigger" onclick="openPrecision(event, 'action', 'f-action')">⚡</div></div>
 
-        <label>Action (A)</label>
-        <div class="aeiou-row"><input id="f-action"><div class="icon-trigger" onclick="openPrecision(event, 'action', 'f-action')">⚡</div></div>
+                <label>Emotion (E)</label>
+                <div class="aeiou-row"><input id="f-emotions"><div class="icon-trigger" onclick="openPrecision(event, 'emotions', 'f-emotions')">🎭</div></div>
 
-        <label>Emotion (E)</label>
-        <div class="aeiou-row"><input id="f-emotions"><div class="icon-trigger" onclick="openPrecision(event, 'emotions', 'f-emotions')">🎭</div></div>
+                <label>Immersion (I)</label>
+                <div class="aeiou-row"><input id="f-immersion"><div class="icon-trigger" onclick="openPrecision(event, 'immersion', 'f-immersion')">🌊</div></div>
 
-        <label>Immersion (I)</label>
-        <div class="aeiou-row"><input id="f-immersion"><div class="icon-trigger" onclick="openPrecision(event, 'immersion', 'f-immersion')">🌊</div></div>
+                <label>Obstacle (O)</label>
+                <div class="aeiou-row"><input id="f-obstacle"><div class="icon-trigger" onclick="openPrecision(event, 'obstacle', 'f-obstacle')">🧱</div></div>
 
-        <label>Obstacle (O)</label>
-        <div class="aeiou-row"><input id="f-obstacle"><div class="icon-trigger" onclick="openPrecision(event, 'obstacle', 'f-obstacle')">🧱</div></div>
-
-        <label>Utility (U)</label>
-        <div class="aeiou-row"><input id="f-utility"><div class="icon-trigger" onclick="openPrecision(event, 'utility', 'f-utility')">🛠</div></div>
-
-        <label>Characters</label><input id="p-char">
-        <label>Settings</label><input id="p-set">
-        
+                <label>Utility (U)</label>
+                <div class="aeiou-row"><input id="f-utility"><div class="icon-trigger" onclick="openPrecision(event, 'utility', 'f-utility')">🛠</div></div>
+            </div>
+        </div>
         <button style="margin-top: 25px; width: 100%; padding: 12px; background: #005f73; border:none; color:white; font-weight:bold;" onclick="saveAndClose()">Save & Exit</button>
     </div>
 </div>
@@ -90,7 +103,6 @@
 
 <script>
     let activeNode = null, sourceNode = null, activeEdge = null, registry = { characters: {}, settings: {} };
-    let highlightedNodes = [];
     let lensMode = { type: null, name: null };
     let currentTargetFieldId = null;
     const Y_SCALE = 60;
@@ -113,12 +125,41 @@
             }},
             { selector: 'edge[friction]', style: { 
                 'source-label': 'data(friction)', 'source-text-offset': 40, 'color': '#ff4500', 'font-weight': 'bold', 'text-outline-color': '#0f0f0f', 'text-outline-width': 2
-            }},
-            { selector: '.ghost', style: { 'opacity': 0.01, 'text-opacity': 0 }},
-            { selector: '.lens-highlight', style: { 'border-width': 8, 'border-color': '#00d4ff', 'line-color': '#00d4ff', 'width': 8, 'opacity': 1, 'text-opacity': 1 }}
+            }}
         ]
     });
 
+    // --- Highlighting Logic ---
+    function applyLens(type, name) {
+        lensMode = { type: type, name: name };
+        const dataKey = type;
+        const targetName = name.trim().toLowerCase();
+
+        cy.elements().removeClass('lens-highlight').addClass('ghost');
+
+        const matchingNodes = cy.nodes().filter(n => {
+            const list = n.data(dataKey) || [];
+            return list.some(item => item.trim().toLowerCase() === targetName);
+        });
+
+        matchingNodes.removeClass('ghost').addClass('lens-highlight');
+
+        cy.edges().forEach(e => {
+            if (e.source().hasClass('lens-highlight') && e.target().hasClass('lens-highlight')) {
+                e.removeClass('ghost').addClass('lens-highlight');
+            }
+        });
+
+        refreshRegistry();
+    }
+
+    function clearHighlights() {
+        lensMode = { type: null, name: null };
+        cy.elements().removeClass('ghost').removeClass('lens-highlight');
+        refreshRegistry();
+    }
+
+    // --- Modal & AEIOU Logic ---
     function openPrecision(event, bankKey, targetId) {
         currentTargetFieldId = targetId;
         const menu = document.getElementById('precision-menu');
@@ -150,6 +191,32 @@
         document.getElementById('precision-menu').style.display = 'none';
     }
 
+    function openInspector(n) {
+        activeNode = n; const d = n.data();
+        document.getElementById('inspector-popup').style.display = 'block';
+        document.querySelector('.overlay').style.display = 'block';
+        document.getElementById('p-label').value = d.label || '';
+        document.getElementById('p-score').value = d.score || 0;
+        ['action', 'emotions', 'immersion', 'obstacle', 'utility'].forEach(k => { document.getElementById('f-' + k).value = d[k] || ''; });
+        document.getElementById('p-char').value = (d.characters || []).join(', ');
+        document.getElementById('p-set').value = (d.settings || []).join(', ');
+    }
+
+    function saveAndClose() {
+        if (!activeNode) return;
+        const score = document.getElementById('p-score').value;
+        const chars = document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s);
+        const sets = document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s);
+        let updateData = { label: document.getElementById('p-label').value, score: score, characters: chars, settings: sets, color: nPos(score) };
+        ['action', 'emotions', 'immersion', 'obstacle', 'utility'].forEach(k => { updateData[k] = document.getElementById('f-' + k).value; });
+        activeNode.data(updateData);
+        activeNode.position('y', (window.innerHeight/2) - (score * Y_SCALE));
+        chars.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { desc: '' }; });
+        sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { desc: '' }; });
+        refreshRegistry(); closeAllModals();
+    }
+
+    // --- Core Graph Functions ---
     window.onload = function() {
         const h = window.innerHeight / 2;
         cy.add([
@@ -168,14 +235,14 @@
 
     cy.on('tap', 'node', function(evt){
         let n = evt.target;
-        if (!sourceNode) { sourceNode = n; highlightNode(n); } 
+        if (!sourceNode) { sourceNode = n; n.style({'border-width':6, 'border-color':'#00d4ff'}); } 
         else {
             if (sourceNode.id() === n.id()) { openInspector(n); } 
             else {
                 const s = sourceNode;
                 showCustomPrompt("Connection Label", "Action...", (val) => { if (val) cy.add({ group: 'edges', data: { source: s.id(), target: n.id(), action: val } }); });
             }
-            resetHighlights(); sourceNode = null;
+            sourceNode.style({'border-width':0}); sourceNode = null;
         }
     });
 
@@ -203,40 +270,6 @@
         }
     }
 
-    function openInspector(n) {
-        activeNode = n; const d = n.data();
-        document.getElementById('inspector-popup').style.display = 'block';
-        document.querySelector('.overlay').style.display = 'block';
-        document.getElementById('p-label').value = d.label || '';
-        document.getElementById('p-score').value = d.score || 0;
-        ['action', 'emotions', 'immersion', 'obstacle', 'utility'].forEach(k => { document.getElementById('f-' + k).value = d[k] || ''; });
-        document.getElementById('p-char').value = (d.characters || []).join(', ');
-        document.getElementById('p-set').value = (d.settings || []).join(', ');
-    }
-
-    function saveAndClose() {
-        if (!activeNode) return;
-        const score = document.getElementById('p-score').value;
-        const chars = document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s);
-        const sets = document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s);
-        let updateData = { label: document.getElementById('p-label').value, score: score, characters: chars, settings: sets, color: nPos(score) };
-        ['action', 'emotions', 'immersion', 'obstacle', 'utility'].forEach(k => { updateData[k] = document.getElementById('f-' + k).value; });
-        activeNode.data(updateData);
-        activeNode.position('y', (window.innerHeight/2) - (score * Y_SCALE));
-        chars.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { h1: '', h2: '', desc: '' }; });
-        sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { h1: '', h2: '', desc: '' }; });
-        refreshRegistry(); closeAllModals();
-    }
-
-    function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
-    function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; document.getElementById('precision-menu').style.display = 'none'; activeNode = null; activeEdge = null; sourceNode = null; }
-    function highlightNode(node) { node.scratch('origStyle', { 'border-width': 0, 'width': 80, 'height': 80 }); node.style({ 'border-width': 6, 'border-color': '#00d4ff' }); highlightedNodes.push(node); }
-    function resetHighlights() { highlightedNodes.forEach(n => n.style(n.scratch('origStyle'))); highlightedNodes = []; }
-    function showCustomPrompt(title, placeholder, callback) {
-        document.querySelector('.overlay').style.display = 'block'; document.getElementById('prompt-modal').style.display = 'block';
-        document.getElementById('modal-title').innerText = title; const input = document.getElementById('modal-input');
-        input.value = ''; input.placeholder = placeholder; document.getElementById('modal-confirm').onclick = () => { callback(input.value); closeAllModals(); };
-    }
     function refreshRegistry() {
         let html = '';
         ['characters', 'settings'].forEach(type => {
@@ -248,18 +281,13 @@
         });
         document.getElementById('registry-content').innerHTML = html;
     }
-    function applyLens(type, name) {
-        lensMode = { type: type, name: name }; const dataKey = type === 'characters' ? 'characters' : 'settings'; const targetName = name.trim().toLowerCase();
-        cy.elements().removeClass('lens-highlight').addClass('ghost');
-        const matches = cy.nodes().filter(n => { const list = n.data(dataKey) || []; return list.some(item => item.trim().toLowerCase() === targetName); });
-        matches.removeClass('ghost').addClass('lens-highlight');
-        refreshRegistry();
-    }
-    function clearHighlights() {
-        lensMode = { type: null, name: null }; cy.elements().removeClass('ghost').removeClass('lens-highlight');
-        cy.nodes().forEach(n => { n.style({ 'width': 80, 'height': 80, 'shape': 'ellipse', 'opacity': 1, 'border-width': 0 }); });
-        cy.edges().forEach(e => { e.style({ 'line-color': '#333', 'width': 3, 'opacity': 1 }); });
-        refreshRegistry();
+
+    function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
+    function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; document.getElementById('precision-menu').style.display = 'none'; activeNode = null; activeEdge = null; sourceNode = null; }
+    function showCustomPrompt(title, placeholder, callback) {
+        document.querySelector('.overlay').style.display = 'block'; document.getElementById('prompt-modal').style.display = 'block';
+        document.getElementById('modal-title').innerText = title; const input = document.getElementById('modal-input');
+        input.value = ''; input.placeholder = placeholder; document.getElementById('modal-confirm').onclick = () => { callback(input.value); closeAllModals(); };
     }
     function triggerRename() { showCustomPrompt("Rename Action", "Label...", (val) => { if(val) activeEdge.data('action', val); }); }
     function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v43.json"; a.click(); }
