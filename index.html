@@ -1,26 +1,25 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v21</title>
+    <title>Narrative Systems Engine v22</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
         #main-wrapper { display: flex; flex-grow: 1; flex-direction: column; position: relative; }
         #cy { flex-grow: 1; background: #0f0f0f; }
-        #registry-panel { width: 380px; background: #151515; border-left: 1px solid #333; padding: 20px; overflow-y: auto; }
-        .registry-item { background: #222; padding: 10px; border-radius: 6px; margin-top: 10px; border-left: 4px solid #00d4ff; }
+        #registry-panel { width: 420px; background: #151515; border-left: 1px solid #333; padding: 20px; overflow-y: auto; }
+        .registry-item { background: #222; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #00d4ff; }
+        .hybrid-box { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .hybrid-img { width: 100%; height: 120px; background: #333; border-radius: 4px; object-fit: cover; }
         
-        /* Custom Modal System */
-        .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 2000; box-shadow: 0 0 60px rgba(0,0,0,1); color: #fff; }
+        .custom-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 2px solid #00d4ff; border-radius: 12px; padding: 25px; display: none; z-index: 2000; box-shadow: 0 0 60px #000; color: #fff; width: 400px; }
         #inspector-popup { width: 850px; }
-        #prompt-modal { width: 400px; text-align: center; }
         
-        .pop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
-        .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 12px; border-radius: 8px; border: 1px solid #333; }
-        button { cursor: pointer; padding: 6px 12px; margin: 2px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 11px; transition: 0.2s; }
-        button:hover { border-color: #00d4ff; background: #444; }
-        input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; }
-        label { font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 12px; }
+        .pop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .controls { position: absolute; top: 15px; left: 15px; z-index: 999; background: #1a1a1a; padding: 10px; border-radius: 8px; border: 1px solid #333; }
+        button { cursor: pointer; padding: 8px 12px; margin: 2px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 11px; }
+        input, textarea { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; }
+        label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 10px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
     </style>
 </head>
@@ -30,20 +29,19 @@
 
 <div id="prompt-modal" class="custom-modal">
     <h3 id="modal-title" style="color:#00d4ff; margin-top:0;">Input</h3>
-    <input id="modal-input" placeholder="Enter value...">
-    <div style="margin-top:20px;">
-        <button id="modal-confirm">Confirm</button>
-        <button onclick="closeAllModals()">Cancel</button>
+    <input id="modal-input" placeholder="Type here...">
+    <div style="margin-top:20px; display:flex; justify-content: space-between;">
+        <button id="modal-confirm" style="background:#005f73; width:48%;">Confirm</button>
+        <button onclick="closeAllModals()" style="width:48%;">Cancel</button>
     </div>
 </div>
 
 <div id="main-wrapper">
     <div class="controls">
         <button onclick="addNode()">+ New Scene</button>
-        <button onclick="autoBalance()">Auto-Balance Arc</button>
-        <button onclick="exportAll()">Export JSON</button>
+        <button onclick="exportDeep()">Export Deep JSON</button>
         <button onclick="document.getElementById('importFile').click()">Import JSON</button>
-        <input type="file" id="importFile" style="display:none" onchange="importAll(event)">
+        <input type="file" id="importFile" style="display:none" onchange="importDeep(event)">
     </div>
     <div id="cy"></div>
 
@@ -53,26 +51,23 @@
             <div>
                 <label>Scene Label</label><input id="p-label">
                 <label>Score (-10 to 10)</label><input type="number" id="p-score">
-                <div style="border: 1px solid #005f73; padding: 12px; margin-top: 15px; border-radius: 8px;">
-                    <label>Characters</label><input id="p-char">
-                    <label>Setting</label><input id="p-set">
-                </div>
+                <label>Characters (Comma Sep)</label><input id="p-char">
+                <label>Setting (Comma Sep)</label><input id="p-set">
             </div>
             <div>
                 <label>Action</label><input id="p-action">
-                <label>Emotions</label><input id="p-emotions">
-                <label>Immersion</label><input id="p-immersion">
+                <label>Obstacle</label><input id="p-obstacle">
                 <label>Utility</label><input id="p-utility">
             </div>
         </div>
-        <button style="margin-top: 25px; width: 100%; padding: 12px; background: #005f73; border:none; color:white; font-weight:bold;" onclick="saveAndClose()">Save & Exit</button>
+        <button style="margin-top: 25px; width: 100%; padding: 12px; background: #005f73; border:none; color:white;" onclick="saveAndClose()">Save & Exit</button>
     </div>
 </div>
 
 <div id="registry-panel"><h3 style="color: #00d4ff; margin-top: 0;">World Registry</h3><div id="registry-content"></div></div>
 
 <script>
-    let activeNode = null, sourceNode = null, activeEdge = null, registry = { characters: {}, settings: {} };
+    let activeNode = null, sourceNode = null, registry = { characters: {}, settings: {} };
     const Y_SCALE = 60;
 
     var cy = cytoscape({
@@ -80,19 +75,17 @@
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px' }},
             { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#00d4ff' }},
-            { selector: 'node[type="friction"]', style: { 'width': 30, 'height': 30, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top' }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }}
         ]
     });
 
-    function showPrompt(title, placeholder, callback) {
+    function showCustomPrompt(title, callback) {
         document.querySelector('.overlay').style.display = 'block';
         const modal = document.getElementById('prompt-modal');
         modal.style.display = 'block';
         document.getElementById('modal-title').innerText = title;
         const input = document.getElementById('modal-input');
         input.value = '';
-        input.placeholder = placeholder;
         document.getElementById('modal-confirm').onclick = () => {
             callback(input.value);
             closeAllModals();
@@ -101,7 +94,7 @@
 
     function addNode() {
         const id = 'n' + Date.now();
-        cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444' }, position: { x: (cy.nodes().length * 220) + 100, y: window.innerHeight/2 } });
+        cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444' }, position: { x: (cy.nodes().length * 200) + 100, y: window.innerHeight/2 } });
     }
 
     cy.on('tap', 'node', function(evt){
@@ -110,39 +103,25 @@
         else {
             if (sourceNode.id() === n.id()) { openInspector(n); } 
             else {
-                showPrompt("New Connection", "Action or Desire...", (val) => {
-                    if (val) cy.add({ group: 'edges', data: { source: sourceNode.id(), target: n.id(), action: val } });
+                const s = sourceNode; // Hold reference
+                showCustomPrompt("Connection Label", (val) => {
+                    if (val) cy.add({ group: 'edges', data: { source: s.id(), target: n.id(), action: val } });
                 });
             }
             sourceNode.unselect(); sourceNode = null;
         }
     });
 
-    // Connector Interactions
-    cy.on('dblclick', 'edge', function(evt){
-        let edge = evt.target;
-        showPrompt("Edit Action", "Update label...", (val) => {
-            if (val) edge.data('action', val);
+    function openInspector(n) {
+        activeNode = n; const d = n.data();
+        document.querySelector('.overlay').style.display = 'block';
+        document.getElementById('inspector-popup').style.display = 'block';
+        ['label', 'score', 'char', 'set', 'action', 'obstacle', 'utility'].forEach(f => {
+            let el = document.getElementById('p-' + f);
+            if (f === 'char' || f === 'set') el.value = (d[f + 'acters'] || d[f + 'tings'] || []).join(', ');
+            else el.value = d[f] || '';
         });
-    });
-
-    cy.on('tap', 'edge', function(evt){
-        let edge = evt.target;
-        showPrompt("Edge Action", "Type 'N' (Node) or 'F' (Friction)", (val) => {
-            if (val.toUpperCase() === 'N') {
-                const midId = 'n' + Date.now();
-                cy.add({ group: 'nodes', data: { id: midId, label: "Complication", score: 0, color: '#444' }, position: { x: (edge.source().position('x')+edge.target().position('x'))/2, y: (edge.source().position('y')+edge.target().position('y'))/2 } });
-                cy.add([{ group: 'edges', data: { source: edge.source().id(), target: midId, action: "leads to" } }, { group: 'edges', data: { source: midId, target: edge.target().id(), action: edge.data('action') } }]);
-                cy.remove(edge);
-            } else if (val.toUpperCase() === 'F') {
-                showPrompt("Friction Label", "e.g. Internal Doubt", (fLabel) => {
-                    const fId = 'f' + Date.now();
-                    cy.add({ group: 'nodes', data: { id: fId, type: "friction", label: fLabel || "PIN" }, position: { x: (edge.source().position('x')+edge.target().position('x'))/2, y: (edge.source().position('y')+edge.target().position('y'))/2 } });
-                    edge.data('hasFriction', true);
-                });
-            }
-        });
-    });
+    }
 
     function saveAndClose() {
         if (!activeNode) return;
@@ -150,36 +129,65 @@
             label: document.getElementById('p-label').value, score: document.getElementById('p-score').value,
             characters: document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s),
             settings: document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s),
-            action: document.getElementById('p-action').value, emotions: document.getElementById('p-emotions').value,
-            immersion: document.getElementById('p-immersion').value, utility: document.getElementById('p-utility').value,
+            action: document.getElementById('p-action').value,
+            obstacle: document.getElementById('p-obstacle').value,
+            utility: document.getElementById('p-utility').value,
             color: nPos(document.getElementById('p-score').value)
         };
         activeNode.data(d);
         activeNode.position('y', (window.innerHeight/2) - (d.score * Y_SCALE));
+        d.characters.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { ex1: '', ex2: '' }; });
+        d.settings.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { ex1: '', ex2: '' }; });
         refreshRegistry();
         closeAllModals();
     }
 
-    function openInspector(n) {
-        activeNode = n; const d = n.data();
-        document.querySelector('.overlay').style.display = 'block';
-        document.getElementById('inspector-popup').style.display = 'block';
-        ['label', 'score', 'char', 'set', 'action', 'emotions', 'immersion', 'utility'].forEach(f => {
-            let el = document.getElementById('p-' + f);
-            if (f === 'char' || f === 'set') el.value = (d[f + 'acters'] || d[f + 'tings'] || []).join(', ');
-            else el.value = d[f] || '';
+    function refreshRegistry() {
+        let html = '';
+        ['characters', 'settings'].forEach(type => {
+            html += `<h4 style="color:#00d4ff">${type.toUpperCase()}</h4>`;
+            for (let name in registry[type]) {
+                const item = registry[type][name];
+                html += `<div class="registry-item">
+                    <strong>${name}</strong>
+                    <div class="hybrid-box">
+                        <input placeholder="Example 1" value="${item.ex1}" onchange="registry.${type}['${name}'].ex1=this.value; refreshRegistry()">
+                        <input placeholder="Example 2" value="${item.ex2}" onchange="registry.${type}['${name}'].ex2=this.value; refreshRegistry()">
+                    </div>
+                    <div class="hybrid-box">
+                        <img class="hybrid-img" src="https://source.unsplash.com/featured/?${item.ex1}" onerror="this.src='https://via.placeholder.com/150?text=Wait'">
+                        <img class="hybrid-img" src="https://source.unsplash.com/featured/?${item.ex2}" onerror="this.src='https://via.placeholder.com/150?text=Wait'">
+                    </div>
+                </div>`;
+            }
         });
-    }
-
-    function closeAllModals() {
-        document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none');
-        document.querySelector('.overlay').style.display = 'none';
-        activeNode = null;
+        document.getElementById('registry-content').innerHTML = html;
     }
 
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
-    function autoBalance() { cy.layout({ name: 'cose', animate: true, stop: function() { cy.nodes().forEach(n => { if (n.data('type') !== 'friction') n.position('y', (window.innerHeight/2) - (n.data('score') * Y_SCALE)); }); } }).run(); }
-    function refreshRegistry() { /* Standard Registry Update logic */ }
+    function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; if(sourceNode) sourceNode.unselect(); sourceNode = null; }
+    
+    function exportDeep() {
+        const bundle = { graph: cy.elements().jsons(), registry: registry };
+        const blob = new Blob([JSON.stringify(bundle)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "narrative-v22.json";
+        a.click();
+    }
+
+    function importDeep(event) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const bundle = JSON.parse(e.target.result);
+            cy.remove(cy.elements());
+            cy.add(bundle.graph);
+            registry = bundle.registry || { characters: {}, settings: {} };
+            refreshRegistry();
+            cy.layout({ name: 'preset' }).run();
+        };
+        reader.readAsText(event.target.files[0]);
+    }
 </script>
 </body>
 </html>
