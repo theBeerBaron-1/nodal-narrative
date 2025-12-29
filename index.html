@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v16</title>
+    <title>Narrative Systems Engine v17</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -15,7 +15,6 @@
         button { cursor: pointer; padding: 6px 12px; margin: 2px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 11px; }
         input, textarea { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; }
         label { font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 12px; }
-        .friction-pin { background: #ff4500; border-radius: 50%; width: 10px; height: 10px; display: inline-block; margin-right: 5px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
     </style>
 </head>
@@ -37,31 +36,44 @@
         <h3 style="margin: 0 0 15px 0; color: #00d4ff;">SCENE FOCUS</h3>
         <div class="pop-grid">
             <div>
-                <label>Scene Label</label><input id="p-label" oninput="updateActiveNode(false)">
-                <label>Emotional Score (-10 to 10)</label><input type="number" id="p-score" oninput="updateActiveNode(false)">
+                <label>Scene Label</label><input id="p-label">
+                <label>Emotional Score (-10 to 10)</label><input type="number" id="p-score">
                 <div style="border: 1px solid #005f73; padding: 12px; margin-top: 15px; border-radius: 8px;">
-                    <label>Characters</label><input id="p-char" onchange="updateActiveNode(true)">
-                    <label>Setting</label><input id="p-set" onchange="updateActiveNode(true)">
+                    <label>Characters</label><input id="p-char">
+                    <label>Setting</label><input id="p-set">
                 </div>
             </div>
             <div>
-                <label>Action & Emotions</label>
-                <input id="p-action" placeholder="Main Action...">
-                <input id="p-emotions" placeholder="Dominant Emotions...">
-                <label>Immersion Prompt</label>
-                <input id="p-immersion" placeholder="Sensory Anchor...">
+                <label>Action (Prompted)</label><input list="list-actions" id="p-action">
+                <label>Emotions (Prompted)</label><input list="list-emotions" id="p-emotions">
+                <label>Immersion (Sensory)</label><input list="list-immersion" id="p-immersion">
+                <label>Obstacle</label><input id="p-obstacle">
+                <label>Utility (Systemic Role)</label><input list="list-utility" id="p-utility">
                 <button style="margin-top:10px; width:100%; background:#4b0082;" onclick="generateProse()">Generate Prose Draft</button>
-                <textarea id="p-prose" rows="4" placeholder="Prose summary will appear here..." style="margin-top:10px;"></textarea>
+                <textarea id="p-prose" rows="3" style="margin-top:10px;"></textarea>
             </div>
         </div>
-        <button style="margin-top: 25px; width: 100%; padding: 12px; background: #005f73; border:none; color:white;" onclick="closeInspector()">Save & Return</button>
+        <button style="margin-top: 25px; width: 100%; padding: 12px; background: #005f73; border:none; color:white; font-weight:bold;" onclick="saveAndClose()">Save & Return to Map</button>
     </div>
 </div>
 
-<div id="registry-panel">
-    <h3 style="color: #00d4ff; margin-top: 0;">World Registry</h3>
-    <div id="registry-content"></div>
-</div>
+<div id="registry-panel"><h3 style="color: #00d4ff; margin-top: 0;">World Registry</h3><div id="registry-content"></div></div>
+
+<datalist id="list-utility">
+    <option value="Introduces Character"> <option value="Establishes Setting"> <option value="Inciting Incident"> <option value="World Building"> <option value="Characterisation Shift"> <option value="Problem Escalation"> <option value="Thematic Setup"> <option value="Rising Tension"> <option value="False Victory"> <option value="Midpoint Pivot"> <option value="Liminal Transition"> <option value="Climax Component"> <option value="Resolution/Closure"> <option value="Flashback/Backstory"> <option value="Foreshadowing Event"> <option value="Expositional Reveal"> <option value="Internal Reflection"> <option value="Alliance Formation"> <option value="Antagonist Introduction"> <option value="Resource Acquisition"> <option value="Tactical Setback"> <option value="Moral Dilemma"> <option value="Subplot Thread"> <option value="Stakes Raising"> <option value="Quiet Moment/Pacing">
+</datalist>
+
+<datalist id="list-actions">
+    <option value="Confronts"> <option value="Betrays"> <option value="Escapes"> <option value="Discovers"> <option value="Negotiates"> <option value="Infiltrates"> <option value="Rescues"> <option value="Sacrifices"> <option value="Sabotages"> <option value="Ambushes"> <option value="Interrogates"> <option value="Deceives"> <option value="Challenges">
+</datalist>
+
+<datalist id="list-emotions">
+    <option value="Melancholy"> <option value="Euphoria"> <option value="Resentment"> <option value="Dread"> <option value="Anticipation"> <option value="Bitterness"> <option value="Nostalgia"> <option value="Despair"> <option value="Hope"> <option value="Terror">
+</datalist>
+
+<datalist id="list-immersion">
+    <option value="Sulphurous"> <option value="Bleached"> <option value="Rot-sweet"> <option value="Airless"> <option value="Bramble-choked"> <option value="Neon-soaked"> <option value="Dust-caked"> <option value="Glass-fragile"> <option value="Iron-tanged"> <option value="Velvet-dark">
+</datalist>
 
 <script>
     let activeNode = null;
@@ -73,10 +85,7 @@
         container: document.getElementById('cy'),
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'text-wrap': 'wrap', 'text-max-width': '70px' }},
-            { selector: 'edge', style: { 
-                'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier',
-                'label': 'data(action)', 'color': '#00d4ff', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f'
-            }},
+            { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }},
             { selector: 'edge[friction]', style: { 'line-style': 'dashed', 'line-color': '#ff4500' }}
         ]
     });
@@ -86,16 +95,6 @@
         const x = (cy.nodes().length * 200) + 100;
         cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444' }, position: { x: x, y: window.innerHeight/2 } });
     }
-
-    // Interaction for Pins (Friction)
-    cy.on('tap', 'edge', function(evt){
-        let edge = evt.target;
-        let friction = prompt("Enter the Narrative Friction (The 'Pin'):", edge.data('friction') || "");
-        if (friction !== null) {
-            edge.data('friction', friction);
-            edge.data('action', (edge.data('action') || "") + " [📍 " + friction + "]");
-        }
-    });
 
     cy.on('tap', 'node', function(evt){
         let n = evt.target;
@@ -110,31 +109,13 @@
         }
     });
 
-    function autoBalance() {
-        cy.layout({
-            name: 'cose',
-            animate: true,
-            nodeOverlap: 50,
-            componentSpacing: 100,
-            refresh: 20,
-            stop: function() {
-                cy.nodes().forEach(n => {
-                    const score = n.data('score') || 0;
-                    n.position('y', (window.innerHeight/2) - (score * Y_SCALE));
-                });
-            }
-        }).run();
-    }
-
-    function generateProse() {
-        const act = document.getElementById('p-action').value;
-        const emo = document.getElementById('p-emotions').value;
-        const imm = document.getElementById('p-immersion').value;
-        const chars = document.getElementById('p-char').value;
-        
-        const prose = `${chars || 'Someone'} ${act || 'acts'} amidst a ${imm || 'strange'} atmosphere, gripped by a sudden surge of ${emo || 'emotion'}. This moment serves as a pivot, forcing a confrontation with the surrounding environment.`;
-        document.getElementById('p-prose').value = prose;
-    }
+    cy.on('tap', 'edge', function(evt){
+        let f = prompt("Acupuncture Pin (Narrative Friction):", evt.target.data('friction') || "");
+        if (f !== null) {
+            evt.target.data('friction', f);
+            evt.target.data('action', (evt.target.data('action').split(' [📍')[0]) + (f ? " [📍 " + f + "]" : ""));
+        }
+    });
 
     function openInspector(node) {
         activeNode = node;
@@ -148,37 +129,45 @@
         document.getElementById('p-action').value = d.mainAction || '';
         document.getElementById('p-emotions').value = d.emotions || '';
         document.getElementById('p-immersion').value = d.immersion || '';
+        document.getElementById('p-obstacle').value = d.obstacle || '';
+        document.getElementById('p-utility').value = d.utility || '';
         document.getElementById('p-prose').value = d.prose || '';
     }
 
-    function updateActiveNode(updateRegistry) {
+    function saveAndClose() {
         if (!activeNode) return;
+        const score = document.getElementById('p-score').value;
         const d = {
             label: document.getElementById('p-label').value,
-            score: document.getElementById('p-score').value,
+            score: score,
             characters: document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s),
             settings: document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s),
             mainAction: document.getElementById('p-action').value,
             emotions: document.getElementById('p-emotions').value,
             immersion: document.getElementById('p-immersion').value,
+            obstacle: document.getElementById('p-obstacle').value,
+            utility: document.getElementById('p-utility').value,
             prose: document.getElementById('p-prose').value,
-            color: nPos(document.getElementById('p-score').value)
+            color: nPos(score)
         };
         activeNode.data(d);
-        activeNode.position('y', (window.innerHeight/2) - (d.score * Y_SCALE));
-        if (updateRegistry) updateRegistryPanel();
+        activeNode.position('y', (window.innerHeight/2) - (score * Y_SCALE));
+        updateRegistryPanel();
+        closeInspector();
+    }
+
+    function generateProse() {
+        const act = document.getElementById('p-action').value;
+        const emo = document.getElementById('p-emotions').value;
+        const imm = document.getElementById('p-immersion').value;
+        document.getElementById('p-prose').value = `Amidst a ${imm || 'harrowing'} silence, the character ${act || 'hesitates'}, their pulse thick with ${emo || 'unspoken dread'}.`;
     }
 
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
-
-    function closeInspector() { 
-        updateActiveNode(true);
-        document.querySelector('.overlay').style.display = 'none'; 
-        document.getElementById('inspector-popup').style.display = 'none'; 
-        activeNode = null; 
-    }
-    
-    // Standard Export/Import logic included here...
+    function closeInspector() { document.querySelector('.overlay').style.display = 'none'; document.getElementById('inspector-popup').style.display = 'none'; activeNode = null; }
+    function autoBalance() { cy.layout({ name: 'cose', animate: true, stop: function() { cy.nodes().forEach(n => n.position('y', (window.innerHeight/2) - (n.data('score')*Y_SCALE))); }}).run(); }
+    function exportAll() { /* Standard Blob Export */ }
+    function importAll(event) { /* Standard FileReader Import */ }
 </script>
 </body>
 </html>
