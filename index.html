@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v34</title>
+    <title>Narrative Systems Engine v35</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -20,10 +20,6 @@
         input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; font-family: inherit; }
         label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 12px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
-        
-        /* Category Word Wheel Styling */
-        optgroup { background: #111; color: #00d4ff; font-style: normal; }
-        option { color: #fff; }
     </style>
 </head>
 <body>
@@ -34,7 +30,7 @@
     <h3 style="color:#00d4ff; margin:0 0 15px 0;">Connector Action</h3>
     <button onclick="triggerRename()" style="width:100%; padding:12px; margin-bottom:8px;">✎ Rename Label</button>
     <button onclick="handleConnectorChoice('N')" style="width:100%; padding:12px; margin-bottom:8px;">+ Add Complication Node</button>
-    <button onclick="handleConnectorChoice('F')" style="width:100%; padding:12px;">+ Drop Friction Pin</button>
+    <button onclick="handleConnectorChoice('F')" style="width:100%; padding:12px;">+ Add Friction Pin</button>
 </div>
 
 <div id="prompt-modal" class="custom-modal">
@@ -69,19 +65,16 @@
             <div>
                 <label>Action Family</label>
                 <select id="p-action-wheel" onchange="document.getElementById('p-action').value=this.value"></select>
-                <input id="p-action" placeholder="Refine Action...">
-
+                <input id="p-action">
                 <label>Emotions Family</label>
                 <select id="p-emotions-wheel" onchange="document.getElementById('p-emotions').value=this.value"></select>
-                <input id="p-emotions" placeholder="Refine Emotion...">
-
-                <label>Immersion (Sensory)</label>
+                <input id="p-emotions">
+                <label>Immersion</label>
                 <select id="p-immersion-wheel" onchange="document.getElementById('p-immersion').value=this.value"></select>
-                <input id="p-immersion" placeholder="Refine Sensory Detail...">
-
+                <input id="p-immersion">
                 <label>Utility</label>
                 <select id="p-utility-wheel" onchange="document.getElementById('p-utility').value=this.value"></select>
-                <input id="p-utility" placeholder="Refine Systemic Role...">
+                <input id="p-utility">
             </div>
         </div>
         <button style="margin-top: 25px; width: 100%; padding: 12px; background: #005f73; border:none; color:white; font-weight:bold;" onclick="saveAndClose()">Save & Exit</button>
@@ -107,17 +100,18 @@
         style: [
             { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'text-wrap': 'wrap' }},
             { selector: 'node[type="friction"]', style: { 'width': 30, 'height': 30, 'background-color': '#ff4500', 'shape': 'diamond', 'label': 'data(label)', 'color': '#ff4500', 'text-valign': 'top', 'z-index': 999 }},
-            { selector: 'node[type="midpoint"]', style: { 'width': 5, 'height': 5, 'background-color': '#00d4ff', 'opacity': 0.8 }},
+            { selector: 'node[type="midpoint"]', style: { 'width': 8, 'height': 8, 'background-color': '#00d4ff', 'shape': 'ellipse', 'label': '' }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }},
             { selector: 'edge[type="needle"]', style: { 'width': 2, 'line-color': '#ff4500', 'line-style': 'dashed', 'target-arrow-shape': 'none' }},
-            { selector: '.ghost', style: { 'opacity': 0.05, 'text-opacity': 0 }}
+            { selector: '.ghost', style: { 'opacity': 0.05, 'text-opacity': 0 }},
+            { selector: '.lens-highlight', style: { 'border-width': 6, 'border-color': '#00d4ff', 'line-color': '#00d4ff', 'width': 6 }}
         ]
     });
 
     function populateWheels() {
         ['action', 'emotions', 'immersion', 'utility'].forEach(key => {
             const select = document.getElementById(`p-${key}-wheel`);
-            select.innerHTML = '<option value="">Select from Family...</option>';
+            select.innerHTML = '<option value="">Select Category...</option>';
             for (let group in families[key]) {
                 let optgroup = document.createElement('optgroup');
                 optgroup.label = group;
@@ -142,7 +136,7 @@
 
     function addNode() {
         const id = 'n' + Date.now();
-        cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444' }, position: { x: (cy.nodes().filter('[type!="friction"]').length * 220) + 100, y: window.innerHeight/2 } });
+        cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444' }, position: { x: (cy.nodes().filter('[type!="friction"][type!="midpoint"]').length * 220) + 100, y: window.innerHeight/2 } });
     }
 
     cy.on('tap', 'node', function(evt){
@@ -183,20 +177,24 @@
                 const midNodeId = 'mid' + Date.now();
                 const pinId = 'f' + Date.now();
                 
+                // 1. Create a tiny actual node as the anchor
                 cy.add({ group: 'nodes', data: { id: midNodeId, type: 'midpoint' }, position: { x: midX, y: midY } });
                 
+                // 2. Simple perpendicular offset calculation
                 const dx = tPos.x - sPos.x;
                 const dy = tPos.y - sPos.y;
                 const len = Math.sqrt(dx*dx + dy*dy) || 1;
                 const nx = -dy / len;
                 const ny = dx / len;
                 
+                // 3. Add the diamond friction node
                 cy.add({ 
                     group: 'nodes', 
                     data: { id: pinId, type: "friction", label: fLab || "PIN" }, 
                     position: { x: midX + (nx * 60), y: midY + (ny * 60) } 
                 });
                 
+                // 4. Draw the visible needle connection
                 cy.add({ group: 'edges', data: { source: midNodeId, target: pinId, type: 'needle' } });
             });
         } else if (choice === 'N') {
@@ -248,27 +246,27 @@
     function applyLens(type, name) {
         lensMode = { type: type, name: name };
         const dataKey = type === 'characters' ? 'characters' : 'settings';
-        cy.elements().addClass('ghost');
-        const matches = cy.nodes().filter(n => (n.data(dataKey) || []).includes(name));
-        matches.removeClass('ghost');
+        
+        cy.elements().removeClass('lens-highlight').addClass('ghost');
+        
+        const matchingNodes = cy.nodes().filter(n => (n.data(dataKey) || []).includes(name));
+        matchingNodes.removeClass('ghost').addClass('lens-highlight');
+
         cy.edges().forEach(e => {
             const hasS = (e.source().data(dataKey) || []).includes(name);
             const hasT = (e.target().data(dataKey) || []).includes(name);
-            if (hasS && hasT) e.removeClass('ghost').style({'line-color': '#00d4ff', 'width': 6});
-            else if (e.data('type') === 'needle') { /* keep needles? */ }
-            else e.style({'line-color': '#333', 'width': 4});
+            if (hasS && hasT) e.removeClass('ghost').addClass('lens-highlight');
         });
         refreshRegistry();
     }
 
     function clearHighlights() {
         lensMode = { type: null, name: null };
-        cy.elements().removeClass('ghost').style({
-            'opacity': 1, 'width': 4, 'line-color': '#333', 'text-opacity': 1
-        });
-        cy.nodes().style({'width': 80, 'height': 80});
+        cy.elements().removeClass('ghost').removeClass('lens-highlight');
+        cy.nodes().style({'width': 80, 'height': 80, 'opacity': 1, 'border-width': 0});
         cy.nodes('[type="friction"]').style({'width': 30, 'height': 30});
-        cy.nodes('[type="midpoint"]').style({'width': 5, 'height': 5});
+        cy.nodes('[type="midpoint"]').style({'width': 8, 'height': 8});
+        cy.edges().style({'line-color': '#333', 'width': 4, 'opacity': 1});
         refreshRegistry();
     }
 
@@ -293,7 +291,7 @@
 
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
     function closeAllModals() { document.querySelectorAll('.custom-modal').forEach(m => m.style.display = 'none'); document.querySelector('.overlay').style.display = 'none'; activeNode = null; activeEdge = null; }
-    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v34.json"; a.click(); }
+    function exportDeep() { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ graph: cy.elements().jsons(), registry: registry })], { type: "application/json" })); a.download = "narrative-v35.json"; a.click(); }
     function importDeep(e) { const r = new FileReader(); r.onload=(ev)=>{ const b=JSON.parse(ev.target.result); cy.remove(cy.elements()); cy.add(b.graph); registry=b.registry; refreshRegistry(); cy.layout({name:'preset'}).run(); }; r.readAsText(e.target.files[0]); }
 </script>
 </body>
