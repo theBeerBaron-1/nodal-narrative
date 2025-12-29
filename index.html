@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Narrative Systems Engine v18</title>
+    <title>Narrative Systems Engine v19</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #0f0f0f; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
@@ -16,7 +16,9 @@
         input, textarea, select { background: #222; border: 1px solid #444; color: #fff; width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; }
         label { font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold; display: block; margin-top: 12px; }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
-        .wheel-container { position: fixed; top: 10%; right: 400px; width: 250px; background: #1a1a1a; border: 1px solid #00d4ff; z-index: 1002; display: none; padding: 10px; border-radius: 8px; max-height: 70vh; overflow-y: auto; }
+        .wheel-container { position: fixed; top: 10%; right: 400px; width: 280px; background: #1a1a1a; border: 2px solid #00d4ff; z-index: 1002; display: none; padding: 15px; border-radius: 12px; max-height: 70vh; overflow-y: auto; box-shadow: 0 0 20px #00d4ff; }
+        .wheel-item { width: 100%; text-align: left; margin: 3px 0; background: #222; border: 1px solid #444; color: #eee; padding: 8px; border-radius: 4px; cursor: pointer; }
+        .wheel-item:hover { border-color: #00d4ff; background: #2a2a2a; }
     </style>
 </head>
 <body>
@@ -34,9 +36,8 @@
     <div id="cy"></div>
 
     <div id="lexical-wheel" class="wheel-container">
-        <h4 style="margin:0; color:#00d4ff">Lexical Bank</h4>
+        <h4 id="wheel-title" style="margin:0 0 10px 0; color:#00d4ff; text-align:center;">Lexical Wheel</h4>
         <div id="wheel-content"></div>
-        <button onclick="document.getElementById('lexical-wheel').style.display='none'" style="width:100%; margin-top:10px;">Close Wheel</button>
     </div>
 
     <div id="inspector-popup">
@@ -51,10 +52,10 @@
                 </div>
             </div>
             <div>
-                <label>Action <button onclick="toggleWheel('actions')">🔍 View Wheel</button></label><input id="p-action">
-                <label>Emotions <button onclick="toggleWheel('emotions')">🔍 View Wheel</button></label><input id="p-emotions">
-                <label>Immersion <button onclick="toggleWheel('immersion')">🔍 View Wheel</button></label><input id="p-immersion">
-                <label>Utility <button onclick="toggleWheel('utility')">🔍 View Wheel</button></label><input id="p-utility">
+                <label>Action <button onclick="toggleWheel('action')">🔍 Wheel</button></label><input id="p-action">
+                <label>Emotions <button onclick="toggleWheel('emotions')">🔍 Wheel</button></label><input id="p-emotions">
+                <label>Immersion <button onclick="toggleWheel('immersion')">🔍 Wheel</button></label><input id="p-immersion">
+                <label>Utility <button onclick="toggleWheel('utility')">🔍 Wheel</button></label><input id="p-utility">
                 <label>Obstacle</label><input id="p-obstacle">
             </div>
         </div>
@@ -71,34 +72,37 @@
     const Y_SCALE = 60;
 
     const banks = {
-        utility: ["Introduces Character", "Establishes Setting", "Inciting Incident", "World Building", "Characterisation Shift", "Problem Escalation", "Thematic Setup", "Rising Tension", "Midpoint Pivot", "Resolution", "Moral Dilemma", "Tactical Setback"],
-        actions: ["Confronts", "Betrays", "Escapes", "Discovers", "Negotiates", "Rescues", "Sacrifices", "Sabotages", "Ambushes", "Deceives", "Confesses", "Explores"],
-        emotions: ["Melancholy", "Euphoria", "Resentment", "Dread", "Anticipation", "Nostalgia", "Despair", "Hope", "Terror", "Gratitude", "Shame", "Determination"],
-        immersion: ["Sulphurous", "Bleached", "Rot-sweet", "Airless", "Luminous", "Neon-soaked", "Iron-tanged", "Velvet-dark", "Salt-sprayed", "Ancient", "Industrial", "Fragile"]
+        utility: ["Introduces Character", "Establishes Setting", "Inciting Incident", "World Building", "Characterisation Shift", "Problem Escalation", "Rising Tension", "Midpoint Pivot", "Resolution"],
+        action: ["Confronts", "Betrays", "Escapes", "Discovers", "Negotiates", "Rescues", "Sacrifices", "Sabotages", "Ambushes", "Deceives"],
+        emotions: ["Melancholy", "Euphoria", "Resentment", "Dread", "Anticipation", "Nostalgia", "Despair", "Hope", "Terror", "Gratitude"],
+        immersion: ["Sulphurous", "Bleached", "Rot-sweet", "Airless", "Luminous", "Neon-soaked", "Iron-tanged", "Velvet-dark", "Salt-sprayed", "Ancient", "Glistening"]
     };
 
     var cy = cytoscape({
         container: document.getElementById('cy'),
         style: [
-            { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px', 'text-wrap': 'wrap' }},
-            { selector: 'node[type="friction"]', style: { 'width': 30, 'height': 30, 'background-color': '#ff4500', 'shape': 'diamond' }},
+            { selector: 'node', style: { 'label': 'data(label)', 'background-color': 'data(color)', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80, 'font-size': '10px' }},
+            { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#00d4ff' }},
+            { selector: 'node[type="friction"]', style: { 'width': 25, 'height': 25, 'background-color': '#ff4500', 'shape': 'diamond', 'label': '' }},
             { selector: 'edge', style: { 'width': 4, 'line-color': '#333', 'target-arrow-shape': 'triangle', 'label': 'data(action)', 'color': '#00d4ff', 'curve-style': 'bezier', 'font-size': '11px', 'text-background-opacity': 1, 'text-background-color': '#0f0f0f' }}
         ]
     });
 
     function addNode() {
         const id = 'n' + Date.now();
-        const x = (cy.nodes().length * 200) + 100;
-        cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444', characters: [], settings: [] }, position: { x: x, y: window.innerHeight/2 } });
+        cy.add({ group: 'nodes', data: { id: id, label: "New Scene", score: 0, color: '#444', characters: [], settings: [] }, position: { x: (cy.nodes().length * 200) + 100, y: window.innerHeight/2 } });
         refreshRegistry();
     }
 
     cy.on('tap', 'node', function(evt){
         let n = evt.target;
-        if (!sourceNode) { sourceNode = n; n.select(); } 
-        else {
-            if (sourceNode.id() === n.id()) { openInspector(n); } 
-            else {
+        if (!sourceNode) { 
+            sourceNode = n; 
+            n.select(); // Restored Highlight Halo
+        } else {
+            if (sourceNode.id() === n.id()) { 
+                openInspector(n); 
+            } else {
                 let act = prompt("Connection Action:");
                 if (act) cy.add({ group: 'edges', data: { source: sourceNode.id(), target: n.id(), action: act } });
             }
@@ -108,7 +112,7 @@
 
     cy.on('tap', 'edge', function(evt){
         let edge = evt.target;
-        let choice = prompt("Type 'N' to add a mid-scene Node, or 'F' to add a Friction Pin:");
+        let choice = prompt("Type 'N' for Complication Node, 'F' for Friction Pin:");
         if (choice?.toUpperCase() === 'N') {
             const midId = 'n' + Date.now();
             cy.add({ group: 'nodes', data: { id: midId, label: "Complication", score: 0, color: '#444' }, position: { x: (edge.source().position('x')+edge.target().position('x'))/2, y: (edge.source().position('y')+edge.target().position('y'))/2 } });
@@ -116,24 +120,23 @@
             cy.remove(edge);
         } else if (choice?.toUpperCase() === 'F') {
             const fId = 'f' + Date.now();
+            // Calculation for true midpoint to ensure dissection look
             const midX = (edge.source().position('x') + edge.target().position('x')) / 2;
             const midY = (edge.source().position('y') + edge.target().position('y')) / 2;
-            cy.add({ group: 'nodes', data: { id: fId, label: "FRICTION", type: "friction" }, position: { x: midX, y: midY - 50 } });
-            cy.add({ group: 'edges', data: { source: fId, target: edge.source().id(), action: "friction" } });
+            cy.add({ group: 'nodes', data: { id: fId, type: "friction" }, position: { x: midX, y: midY } });
         }
     });
 
-    function toggleWheel(bankKey) {
+    function toggleWheel(key) {
         const wheel = document.getElementById('lexical-wheel');
         const content = document.getElementById('wheel-content');
+        document.getElementById('wheel-title').innerText = key.toUpperCase();
+        content.innerHTML = banks[key].map(word => `<button class="wheel-item" onclick="selectWord('${key}','${word}')">${word}</button>`).join('');
         wheel.style.display = 'block';
-        content.innerHTML = banks[bankKey].map(word => `<button style="width:100%; text-align:left; margin:2px 0;" onclick="selectFromWheel('${bankKey}','${word}')">${word}</button>`).join('');
     }
 
-    function selectFromWheel(bankKey, word) {
-        let fieldId = 'p-' + bankKey.replace('s','');
-        if (bankKey === 'actions') fieldId = 'p-action';
-        document.getElementById(fieldId).value = word;
+    function selectWord(key, word) {
+        document.getElementById('p-' + key).value = word;
         document.getElementById('lexical-wheel').style.display = 'none';
     }
 
@@ -142,40 +145,37 @@
         const score = document.getElementById('p-score').value;
         const chars = document.getElementById('p-char').value.split(',').map(s=>s.trim()).filter(s=>s);
         const sets = document.getElementById('p-set').value.split(',').map(s=>s.trim()).filter(s=>s);
-        
         activeNode.data({
             label: document.getElementById('p-label').value, score: score,
             characters: chars, settings: sets,
-            mainAction: document.getElementById('p-action').value,
+            action: document.getElementById('p-action').value,
             emotions: document.getElementById('p-emotions').value,
             immersion: document.getElementById('p-immersion').value,
-            obstacle: document.getElementById('p-obstacle').value,
             utility: document.getElementById('p-utility').value,
+            obstacle: document.getElementById('p-obstacle').value,
             color: nPos(score)
         });
         activeNode.position('y', (window.innerHeight/2) - (score * Y_SCALE));
-        
         chars.forEach(c => { if(!registry.characters[c]) registry.characters[c] = { desc: '' }; });
         sets.forEach(s => { if(!registry.settings[s]) registry.settings[s] = { desc: '' }; });
-        
         refreshRegistry();
         closeInspector();
     }
 
     function openInspector(node) {
         activeNode = node;
+        const d = node.data();
         document.querySelector('.overlay').style.display = 'block';
         document.getElementById('inspector-popup').style.display = 'block';
-        const d = node.data();
         document.getElementById('p-label').value = d.label || '';
         document.getElementById('p-score').value = d.score || 0;
         document.getElementById('p-char').value = (d.characters || []).join(', ');
         document.getElementById('p-set').value = (d.settings || []).join(', ');
-        document.getElementById('p-action').value = d.mainAction || '';
+        document.getElementById('p-action').value = d.action || '';
         document.getElementById('p-emotions').value = d.emotions || '';
         document.getElementById('p-immersion').value = d.immersion || '';
-        document.getElementById('p-obstacle').value = d.obstacle || '';
         document.getElementById('p-utility').value = d.utility || '';
+        document.getElementById('p-obstacle').value = d.obstacle || '';
     }
 
     function refreshRegistry() {
@@ -191,7 +191,6 @@
 
     function nPos(s) { let v = parseInt(s); return v > 0 ? `rgb(0,${100+v*15},150)` : (v < 0 ? `rgb(${100+Math.abs(v)*15},30,60)` : '#444'); }
     function closeInspector() { document.querySelector('.overlay').style.display = 'none'; document.getElementById('inspector-popup').style.display = 'none'; activeNode = null; }
-    function autoBalance() { cy.layout({ name: 'cose', animate: true, stop: function() { cy.nodes().forEach(n => { if(n.data('type') !== 'friction') n.position('y', (window.innerHeight/2) - (n.data('score')*Y_SCALE)); })} }).run(); }
 </script>
 </body>
 </html>
